@@ -1,4 +1,4 @@
-import { handleRouteError, jsonError } from "@/lib/api";
+import { cachedJson, handleRouteError, jsonError } from "@/lib/api";
 import { dbGetListing } from "@/lib/db";
 import { isUuid } from "@/lib/listing-validation";
 
@@ -13,7 +13,7 @@ export async function GET(
   try {
     const listing = await dbGetListing(id);
     if (!listing) return jsonError(404, "Listing not found.");
-    return Response.json({ listing });
+    return cachedJson({ listing }, "detail");
   } catch (error) {
     return handleRouteError(error);
   }

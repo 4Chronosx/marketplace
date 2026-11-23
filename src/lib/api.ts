@@ -13,6 +13,23 @@ export function jsonError(
   );
 }
 
+// CDN-only caching (`s-maxage`, no `max-age`): browsers always revalidate, so a
+// user never sees a stale page from their own cache. Used on successful GETs only.
+const CACHE_POLICIES = {
+  list: "public, s-maxage=15, stale-while-revalidate=60",
+  detail: "public, s-maxage=60, stale-while-revalidate=300",
+} as const;
+
+/** `Response.json` with a CDN cache policy. */
+export function cachedJson(
+  body: unknown,
+  policy: keyof typeof CACHE_POLICIES,
+): Response {
+  return Response.json(body, {
+    headers: { "Cache-Control": CACHE_POLICIES[policy] },
+  });
+}
+
 /** Parses a JSON request body; returns undefined when it isn't valid JSON. */
 export async function readJson(request: Request): Promise<unknown> {
   try {

@@ -1,4 +1,4 @@
-import { handleRouteError, jsonError, readJson } from "@/lib/api";
+import { cachedJson, handleRouteError, jsonError, readJson } from "@/lib/api";
 import { dbCreateListing, dbListListings } from "@/lib/db";
 import {
   validateListingQuery,
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   if (!query.ok) return jsonError(400, "Invalid query.", query.errors);
 
   try {
-    return Response.json({ listings: await dbListListings(query.data) });
+    return cachedJson({ listings: await dbListListings(query.data) }, "list");
   } catch (error) {
     return handleRouteError(error);
   }
