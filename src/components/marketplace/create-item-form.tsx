@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { CheckCircle2Icon } from "lucide-react";
+import { CheckCircle2Icon, Loader2Icon } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,7 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CATEGORIES } from "@/lib/categories";
-import { createListing, formatPrice } from "@/lib/listings";
+import { ApiRequestError, createListing, uploadImage } from "@/lib/api-client";
+import { formatPrice } from "@/lib/listings";
 import {
   DESCRIPTION_MAX,
   NAME_MAX,
@@ -42,6 +43,16 @@ const EMPTY_FIELDS: ListingFields = {
 };
 
 type Status = "idle" | "submitting" | "done" | "error";
+
+// API payload field names -> form field names.
+const SERVER_FIELD_NAMES: Record<string, FieldName> = {
+  title: "title",
+  price: "price",
+  category: "category",
+  seller_name: "name",
+  seller_email: "email",
+  description: "description",
+};
 
 function Field({
   name,
@@ -76,10 +87,17 @@ export function CreateItemForm() {
   const [attempted, setAttempted] = useState(false);
   const [priceFocused, setPriceFocused] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [serverErrors, setServerErrors] = useState<
+    Partial<Record<FieldName, string>>
+  >({});
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  // photo id -> uploaded image URL, so a retry after a failed save doesn't upload again.
+  const uploadedRef = useRef(new Map<string, string>());
 
   const errors = validateListing(fields);
   const visibleError = (name: FieldName) =>
-    attempted || touched[name] ? errors[name] : undefined;
+    (attempted || touched[name] ? errors[name] : undefined) ?? serverErrors[name];
 
   const a11y = (name: FieldName) => ({
     id: `field-${name}`,
@@ -87,8 +105,10 @@ export function CreateItemForm() {
     "aria-describedby": visibleError(name) ? `field-${name}-error` : undefined,
   });
 
-  const setField = (name: FieldName, value: string) =>
+  const setField = (name: FieldName, value: string) => {
     setFields((current) => ({ ...current, [name]: value }));
+    setServerErrors((current) => ({ ...current, [name]: undefined }));
+  };
   const touch = (name: FieldName) =>
     setTouched((current) => ({ ...current, [name]: true }));
 
@@ -103,20 +123,61 @@ export function CreateItemForm() {
     }
 
     setStatus("submitting");
+    setSubmitError(null);
+    setServerErrors({});
     try {
-      await createListing({
+      const photo = photos[0];
+      let imageUrl: string | null = null;
+      if (photo) {
+        imageUrl = uploadedRef.current.get(photo.id) ?? null;
+        if (!imageUrl) {
+          const uploaded = await uploadImage(photo.file);
+          imageUrl = uploaded.url;
+          uploadedRef.current.set(photo.id, imageUrl);
+        }
+      }
+
+      const listing = await createListing({
         title: fields.title.trim(),
         description: fields.description.trim(),
         price: parsePrice(fields.price) ?? 0,
         category: fields.category,
         seller_name: fields.name.trim(),
         seller_email: fields.email.trim(),
-        photos: photos.map((photo) => photo.file),
+        image_url: imageUrl,
       });
+      setCreatedId(listing.id);
       setStatus("done");
-    } catch {
+    } catch (error) {
       setStatus("error");
+      showApiError(error);
     }
+  }
+
+  function showApiError(error: unknown) {
+    if (!(error instanceof ApiRequestError)) {
+      setSubmitError("Couldn't publish your listing. Please try again.");
+      return;
+    }
+
+    const mapped: Partial<Record<FieldName, string>> = {};
+    for (const [apiField, message] of Object.entries(error.fields ?? {})) {
+      const field = SERVER_FIELD_NAMES[apiField];
+      if (field) mapped[field] = message;
+    }
+    setServerErrors(mapped);
+
+    const firstInvalid = FIELD_ORDER.find((name) => mapped[name]);
+    if (firstInvalid) {
+      document.getElementById(`field-${firstInvalid}`)?.focus();
+      return;
+    }
+
+    setSubmitError(
+      error.status === 503
+        ? "The database isn't set up yet, so your listing couldn't be saved."
+        : error.message,
+    );
   }
 
   function reset() {
@@ -125,6 +186,10 @@ export function CreateItemForm() {
     setPhotos([]);
     setTouched({});
     setAttempted(false);
+    setServerErrors({});
+    setSubmitError(null);
+    setCreatedId(null);
+    uploadedRef.current.clear();
     setStatus("idle");
   }
 
@@ -132,16 +197,17 @@ export function CreateItemForm() {
     return (
       <div className="flex max-w-xl flex-col items-start gap-3 rounded-xl border p-6">
         <CheckCircle2Icon aria-hidden="true" className="size-8 text-brand" />
-        <h2 className="text-xl font-bold">Your listing is ready</h2>
+        <h2 className="text-xl font-bold">Your listing is live</h2>
         <p>
           &ldquo;{fields.title.trim()}&rdquo; for {formatPrice(parsePrice(fields.price) ?? 0)}.
         </p>
-        <p className="text-sm text-muted-foreground">
-          Heads up: listings aren&apos;t saved yet. Publishing is connected in the
-          database step.
-        </p>
-        <div className="flex gap-2">
-          <Link href="/" className={buttonVariants()}>
+        <div className="flex flex-wrap gap-2">
+          {createdId && (
+            <Link href={`/item/${createdId}`} className={buttonVariants()}>
+              View listing
+            </Link>
+          )}
+          <Link href="/" className={buttonVariants({ variant: "outline" })}>
             Back to Marketplace
           </Link>
           <Button type="button" variant="outline" onClick={reset}>
@@ -252,14 +318,21 @@ export function CreateItemForm() {
           />
         </Field>
 
-        {status === "error" && (
+        {submitError && (
           <p role="alert" className="text-sm text-destructive">
-            Couldn&apos;t publish your listing. Please try again.
+            {submitError}
           </p>
         )}
 
         <Button type="submit" size="lg" className="h-11 w-full text-base" disabled={submitting}>
-          {submitting ? "Publishing..." : "Publish"}
+          {submitting ? (
+            <>
+              <Loader2Icon aria-hidden="true" className="animate-spin" />
+              Publishing...
+            </>
+          ) : (
+            "Publish"
+          )}
         </Button>
       </form>
 

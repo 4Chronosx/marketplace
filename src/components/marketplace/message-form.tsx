@@ -1,10 +1,11 @@
 "use client";
 
 import { useId, useRef, useState, type FormEvent } from "react";
+import { Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { sendMessage } from "@/lib/listings";
+import { ApiRequestError, sendMessage } from "@/lib/api-client";
 import { MESSAGE_MAX, isValidEmail } from "@/lib/listing-validation";
 
 type MessageFormProps = {
@@ -62,11 +63,36 @@ export function MessageForm({ listingId, sellerName }: MessageFormProps) {
       await sendMessage({ listingId, buyerEmail: email, message: text });
       setMessage("");
       setSent(true);
-    } catch {
-      setSubmitError("Couldn't send your message. Please try again.");
+    } catch (error) {
+      showApiError(error);
     } finally {
       setSending(false);
     }
+  }
+
+  function showApiError(error: unknown) {
+    if (!(error instanceof ApiRequestError)) {
+      setSubmitError("Couldn't send your message. Please try again.");
+      return;
+    }
+
+    const fields = error.fields ?? {};
+    if (fields.buyer_email) {
+      setEmailError(fields.buyer_email);
+      emailRef.current?.focus();
+    } else if (fields.message) {
+      setMessageError(fields.message);
+      messageRef.current?.focus();
+    }
+    if (fields.buyer_email || fields.message) return;
+
+    setSubmitError(
+      error.status === 404
+        ? "This listing is no longer available."
+        : error.status === 503
+          ? "Messages can't be saved right now because the database isn't set up yet."
+          : error.message,
+    );
   }
 
   return (
@@ -82,7 +108,6 @@ export function MessageForm({ listingId, sellerName }: MessageFormProps) {
           autoComplete="email"
           value={buyerEmail}
           onChange={(event) => setBuyerEmail(event.target.value)}
-          disabled={sending}
           aria-invalid={emailError ? true : undefined}
           aria-describedby={emailError ? emailErrorId : undefined}
         />
@@ -104,7 +129,6 @@ export function MessageForm({ listingId, sellerName }: MessageFormProps) {
           onChange={(event) => setMessage(event.target.value)}
           placeholder="Hi, is this still available?"
           maxLength={MESSAGE_MAX}
-          disabled={sending}
           aria-invalid={messageError ? true : undefined}
           aria-describedby={messageError ? messageErrorId : undefined}
           className="min-h-32"
@@ -117,7 +141,14 @@ export function MessageForm({ listingId, sellerName }: MessageFormProps) {
       </div>
 
       <Button type="submit" size="lg" className="h-11 w-full text-base" disabled={sending}>
-        {sending ? "Sending..." : "Send"}
+        {sending ? (
+          <>
+            <Loader2Icon aria-hidden="true" className="animate-spin" />
+            Sending...
+          </>
+        ) : (
+          "Send"
+        )}
       </Button>
       <p
         id={statusId}

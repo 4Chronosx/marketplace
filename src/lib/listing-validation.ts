@@ -5,7 +5,13 @@ export const NAME_MAX = 100;
 export const DESCRIPTION_MAX = 1000;
 export const MESSAGE_MAX = 1000;
 export const PRICE_MAX = 10_000_000;
-export const MAX_PHOTOS = 5;
+/** One photo per listing (a single image_url column). */
+export const ALLOWED_IMAGE_MIME: readonly string[] = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+];
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 export const LIST_LIMIT_DEFAULT = 50;
 export const LIST_LIMIT_MAX = 100;
