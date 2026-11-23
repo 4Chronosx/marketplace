@@ -40,7 +40,7 @@ export type Message = {
 
 const LISTING_COLUMNS =
   "id, title, description, price, category, location, seller_name, seller_email, image_url, status, created_at";
-const SUMMARY_COLUMNS = "id, title, price, category, location, image_url, created_at";
+const SUMMARY_COLUMNS = "id, title, price, category, location, image_url, status, created_at";
 const MESSAGE_COLUMNS =
   "id, listing_id, buyer_email, seller_email, message, created_at";
 
@@ -60,7 +60,7 @@ type ListingRow = {
 
 type SummaryRow = Pick<
   ListingRow,
-  "id" | "title" | "price" | "category" | "location" | "image_url" | "created_at"
+  "id" | "title" | "price" | "category" | "location" | "image_url" | "status" | "created_at"
 >;
 
 function toSummary(row: SummaryRow): ListingSummary {
@@ -71,6 +71,7 @@ function toSummary(row: SummaryRow): ListingSummary {
     category: row.category,
     location: row.location ?? DEFAULT_LOCATION,
     image_url: row.image_url,
+    status: row.status,
     created_at: row.created_at,
   };
 }
@@ -291,6 +292,17 @@ export async function dbCreateOrder(
     if (existing) return { order: existing as unknown as Order, created: false };
   }
   throw new DatabaseError(error);
+}
+
+/** The saved order for a Checkout session, or null if the webhook hasn't saved it yet. */
+export async function dbGetOrderBySessionId(sessionId: string): Promise<Order | null> {
+  const { data, error } = await getSupabase()
+    .from("orders")
+    .select(ORDER_COLUMNS)
+    .eq("stripe_session_id", sessionId)
+    .maybeSingle();
+  if (error) throw new DatabaseError(error);
+  return data as unknown as Order | null;
 }
 
 /**

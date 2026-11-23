@@ -9,6 +9,7 @@ What the Marketplace does, the rules it enforces, and its API. To run it, see [S
 - [Get paid with Stripe](#get-paid-with-stripe)
 - [Buy Now](#buy-now)
 - [Payment confirmation](#payment-confirmation)
+- [Order confirmation](#order-confirmation)
 - [Layout and navigation](#layout-and-navigation)
 - [Limits at a glance](#limits-at-a-glance)
 - [API reference](#api-reference)
@@ -48,6 +49,7 @@ Listings are created with the default location **Palo Alto, CA**.
 - **Search** is a box on the home and category pages. It matches the **title or description** (case-insensitive) and keeps you on the same page; the search is kept in the URL (`?q=...`), so it can be shared and survives a refresh. On a category page it searches within the category.
 - Search text is cleaned on the server (characters that have a special meaning in the database filter are dropped) and limited to 100 characters.
 - The grid is 1 column on phones, then 2, 3, 4 and 5 as the screen widens.
+- A listing that has sold stays in the grid with a **Sold** badge and a dimmed photo. Because the list response is cached for 15 seconds, the badge can take a little longer to appear.
 
 Every state is handled:
 
@@ -64,6 +66,7 @@ Every state is handled:
 
 - An id that is not a valid UUID, or a listing that does not exist, shows "Listing not found" with a way back home. A malformed id never calls the server.
 - Long titles and descriptions wrap instead of overflowing.
+- A sold listing shows a **Sold** badge next to the price, and Buy Now is replaced by "This item has been sold."
 
 ## Message the seller
 
@@ -96,7 +99,7 @@ The listing page shows a **Buy Now** button under the price when the item can be
 | Item already sold | "This item has been sold." |
 | Price under $0.50 (including Free) or over $999,999.99 | "This item can't be bought online." |
 
-- **Buy Now** opens Stripe Checkout for the listing's title and price. After paying, the buyer returns to `/order/success`; cancelling returns to the listing.
+- **Buy Now** opens Stripe Checkout for the listing's title and price. After paying, the buyer lands on the [order confirmation](#order-confirmation) page (`/order/success`); cancelling returns to the listing.
 - The payment is a **direct charge** on the seller's connected account. The marketplace keeps a **10% application fee** (`PLATFORM_FEE_RATE` in `src/lib/payments.ts`); the seller receives the rest, minus Stripe's own fees.
 - The server decides whether an item can be bought, not the page. It reads the price from the database (the request only carries the listing id), refuses a sold listing or an unconnected seller, and asks Stripe whether the seller's account can take payments yet. A seller who started onboarding but never finished is refused with "hasn't finished setting up payments".
 
@@ -109,6 +112,15 @@ Stripe tells the marketplace when a payment goes through by calling `POST /api/s
 - Stripe may deliver an event more than once. A repeat never creates a second order.
 - The test sandbox is shared with other apps, so the endpoint also receives events that aren't ours: unknown accounts, unknown listings, unpaid sessions and other event types. All of these are ignored and answered `200`.
 - If two buyers pay for the same listing, both orders are recorded and a warning is logged so the second payment can be refunded by hand.
+
+## Order confirmation
+
+After paying, Stripe sends the buyer to `/order/success`. The page shows what was bought (photo, title, seller, amount paid) and a short order reference, with **View listing** and **Back to Marketplace**. It never shows the buyer's email, Stripe ids or the platform fee.
+
+- The buyer can arrive **before** the webhook has saved the order. The page then says "Payment received. We're confirming your order" and checks again every 2 seconds, switching to the confirmation by itself. It only says this when Stripe confirms the session really was paid.
+- After about 30 seconds it says "We're still confirming your order" and offers **Check again**. The payment is safe; the buyer must not pay twice.
+- A malformed or unknown session id shows "We couldn't find that order" with a way back, and a malformed one never calls the server.
+- Once an order is saved, the listing shows a **Sold** badge on its card (dimmed photo) and on its page. Sold listings stay in the browse grids.
 
 ## Layout and navigation
 
@@ -216,6 +228,16 @@ Returns `{ "url": "https://checkout.stripe.com/…" }`, the Stripe Checkout page
 ### `POST /api/stripe/webhook`
 
 Called by Stripe, not by the site. Needs the `Stripe-Signature` header and the raw JSON body Stripe sent. Answers `200 { "received": true }` for any verified event (acted on or ignored), `400` for a missing or invalid signature, `503` if `STRIPE_WEBHOOK_SECRET` isn't set, and `5xx` if saving fails (Stripe then retries).
+
+### `GET /api/orders/[sessionId]?listing_id=<uuid>`
+
+The order for a Stripe Checkout session, for the confirmation page. Never cached.
+
+| Status | When |
+|---|---|
+| `200 { "order": { … } }` | The order is saved. The body has `reference`, `amount_total` (cents), `currency`, `created_at` and `listing` (`id`, `title`, `image_url`, `seller_name`). |
+| `202 { "pending": true }` | Stripe says the session was paid (checked against the listing's seller account), but the webhook hasn't saved the order yet. |
+| `404` | Malformed or unknown session id, an unpaid session, or one that doesn't belong to this listing. |
 
 ### Data model
 

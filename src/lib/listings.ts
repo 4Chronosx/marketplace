@@ -28,7 +28,7 @@ export type ListingDetail = Listing & { buy_status: BuyStatus };
 /** What a card in the browse grid needs; GET /api/listings returns only this. */
 export type ListingSummary = Pick<
   Listing,
-  "id" | "title" | "price" | "category" | "location" | "image_url" | "created_at"
+  "id" | "title" | "price" | "category" | "location" | "image_url" | "status" | "created_at"
 >;
 
 export function formatPrice(price: number): string {

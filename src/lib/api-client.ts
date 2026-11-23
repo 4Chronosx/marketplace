@@ -1,6 +1,7 @@
 // Browser-side client for our own /api routes (see src/app/api).
 import type { Listing, ListingDetail, ListingSummary } from "./listings";
 import { LIST_LIMIT_MAX, type NewListingPayload } from "./listing-validation";
+import type { OrderSummary } from "./orders";
 
 export class ApiRequestError extends Error {
   readonly status: number;
@@ -103,6 +104,27 @@ export async function createListing(payload: NewListingPayload): Promise<Listing
     body: JSON.stringify(payload),
   });
   return listing;
+}
+
+export type OrderResult =
+  | { status: "ready"; order: OrderSummary }
+  | { status: "confirming" };
+
+/**
+ * The order for a Checkout session. "confirming" means Stripe took the payment
+ * but the webhook hasn't saved the order yet; an unknown order throws a 404.
+ */
+export async function fetchOrder(
+  sessionId: string,
+  listingId?: string,
+  signal?: AbortSignal,
+): Promise<OrderResult> {
+  const query = listingId ? `?listing_id=${encodeURIComponent(listingId)}` : "";
+  const body = await request<{ order?: OrderSummary; pending?: boolean }>(
+    `/api/orders/${encodeURIComponent(sessionId)}${query}`,
+    { signal },
+  );
+  return body.order ? { status: "ready", order: body.order } : { status: "confirming" };
 }
 
 /** Opens Stripe Checkout for a listing; resolves to the Checkout URL. */

@@ -1,20 +1,32 @@
-import Link from "next/link";
-import { buttonVariants } from "@/components/ui/button";
+import { Suspense } from "react";
+import {
+  OrderConfirmation,
+  OrderConfirmationSkeleton,
+} from "@/components/marketplace/order-confirmation";
 
 export const metadata = { title: "Order · Marketplace" };
 
-// Where Stripe Checkout sends the buyer after paying. Placeholder: the order
-// confirmation (reading the saved order) replaces this in a later step.
-export default function OrderSuccessPage() {
+// Where Stripe Checkout sends the buyer after paying, with `session_id` and
+// `listing_id` in the URL. `searchParams` is only known at request time, so it
+// is awaited inside Suspense.
+export default function OrderSuccessPage({
+  searchParams,
+}: PageProps<"/order/success">) {
   return (
-    <div className="flex flex-col items-start gap-3">
-      <h1 className="text-2xl font-bold">Thanks for your purchase</h1>
-      <p className="max-w-md text-muted-foreground">
-        Your payment was submitted. Your order details will appear here soon.
-      </p>
-      <Link href="/" className={buttonVariants({ size: "lg" })}>
-        Back to Marketplace
-      </Link>
-    </div>
+    <Suspense fallback={<OrderConfirmationSkeleton />}>
+      <OrderContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function OrderContent({
+  searchParams,
+}: Pick<PageProps<"/order/success">, "searchParams">) {
+  const { session_id, listing_id } = await searchParams;
+  return (
+    <OrderConfirmation
+      sessionId={typeof session_id === "string" ? session_id : undefined}
+      listingId={typeof listing_id === "string" ? listing_id : undefined}
+    />
   );
 }

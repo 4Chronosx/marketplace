@@ -305,6 +305,12 @@ export function validateConnectPayload(
   return { ok: true, data: { seller_email: email } };
 }
 
+const CHECKOUT_SESSION_ID_RE = /^cs_(test|live)_[A-Za-z0-9]{10,200}$/;
+
+export function isCheckoutSessionId(value: unknown): value is string {
+  return typeof value === "string" && CHECKOUT_SESSION_ID_RE.test(value);
+}
+
 const STRIPE_ACCOUNT_ID_RE = /^acct_[A-Za-z0-9]{1,64}$/;
 
 export function isStripeAccountId(value: unknown): value is string {

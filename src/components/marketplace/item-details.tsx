@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { fetchListing } from "@/lib/api-client";
 import { categoryHref, getCategoryBySlug } from "@/lib/categories";
@@ -92,7 +93,10 @@ export function ItemDetails({ id }: { id: string }) {
         <div className="flex flex-col gap-6">
           <div>
             <h1 className="text-2xl font-bold wrap-break-word">{listing.title}</h1>
-            <p className="text-2xl font-bold">{formatPrice(listing.price)}</p>
+            <p className="flex items-center gap-2 text-2xl font-bold">
+              {formatPrice(listing.price)}
+              {listing.status === "sold" && <Badge>Sold</Badge>}
+            </p>
             <p className="mt-3 text-sm text-muted-foreground">
               Listed <ListedTime iso={listing.created_at} /> in {listing.location}
             </p>

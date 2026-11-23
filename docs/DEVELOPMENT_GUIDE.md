@@ -28,6 +28,7 @@ src/
       connect/refresh/route.ts GET (fresh onboarding link, redirects)
       checkout/route.ts        POST (open Stripe Checkout for a listing)
       stripe/webhook/route.ts  POST (Stripe events: record the order, mark Sold)
+      orders/[sessionId]/route.ts  GET (order confirmation; 202 while the webhook is pending)
   components/
     layout/                    header, sidebar, mobile-nav, category-list
     marketplace/               item-grid, listing-card, item-details, create-item-form, message-form, ...
@@ -42,6 +43,7 @@ src/
     payments.ts                fee rate, currency, cents math, BuyStatus (shared by browser and server)
     checkout.ts                Buy Now: can this listing be bought, then open Checkout
     webhook.ts                 what to do with a verified Stripe event (order + Sold)
+    orders.ts                  the order confirmation shown to the buyer (safe fields only)
     db.ts                      typed database and storage queries
     api.ts                     response helpers for route handlers
     api-client.ts              browser fetch wrapper for /api
