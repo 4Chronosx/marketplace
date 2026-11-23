@@ -128,7 +128,7 @@ On Windows PowerShell, use `curl.exe` instead of `curl`. The full list of routes
 
 1. Push the repository to GitHub.
 2. In Vercel, choose **Add New, then Project**, and import the repository. The Next.js settings are detected automatically.
-3. Under **Environment Variables**, add `SUPABASE_URL` and `SUPABASE_ANON_KEY` (exact names) for all environments. For payments, also add `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
+3. Under **Environment Variables**, add `SUPABASE_URL` and `SUPABASE_ANON_KEY` (exact names) for all environments. For payments, also add `STRIPE_SECRET_KEY` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. `STRIPE_WEBHOOK_SECRET` comes later, in [Payments on the live site](#payments-on-the-live-site).
 4. Deploy.
 5. Smoke test the live URL: open the home page, create a listing with a photo, open it, and send a message. Check the new rows in the Supabase **Table Editor**.
 
@@ -137,6 +137,23 @@ Notes for Vercel:
 - If you add or change the variables after a deploy, **redeploy** so they take effect.
 - Photos are limited to **4 MB** because Vercel Functions reject request bodies over about 4.5 MB.
 - The listing and detail API responses are cached at the CDN for a short time (15 and 60 seconds), so a brand-new listing can take up to about 15 seconds to appear in a cached grid.
+
+### Payments on the live site
+
+Do these in order. The webhook secret only exists once the endpoint is registered, and the endpoint can only be registered once the app (with its `/api/stripe/webhook` route) is deployed.
+
+1. **Run the payments migration** on your Supabase database (`supabase-payments-migration.sql`, see section 2) if you haven't.
+2. **Deploy** with `STRIPE_SECRET_KEY` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` set. Check the Deployments tab shows the latest commit as ready: if `/connect` or `/api/stripe/webhook` return 404 on the live URL, the deployment is out of date.
+3. **Register the webhook** from your machine, using your **production** URL (preview URLs are login-protected, so Stripe cannot reach them):
+
+   ```bash
+   node --env-file=.env.local scripts/create-webhook.mjs
+   ```
+
+   The default URL is the project's production URL; pass `--url=https://your-domain/api/stripe/webhook` to use another. The script prints a `whsec_...` signing secret **once**.
+4. **Save the secret** in Vercel as a variable named exactly `STRIPE_WEBHOOK_SECRET` (Production), then **redeploy**. Do not put it in `.env.local`: local testing uses the temporary secret from `stripe listen` (see section 3).
+5. **If you lose the secret**, run the script again with `--replace`. It deletes the endpoint with that exact URL and creates a new one with a new secret. It never touches other endpoints; the Stripe sandbox is shared with other people, so the endpoint also receives events that aren't yours, which the app ignores.
+6. **Try it:** on the live site connect a seller at `/connect` with Stripe's test data, open one of that seller's listings, click **Buy Now** and pay with `4242 4242 4242 4242`. You should land on the order page, the order should appear in the `orders` table, and the listing should show **Sold**.
 
 ## Troubleshooting
 
@@ -149,6 +166,8 @@ Notes for Vercel:
 | `next build` fails with an error about `.next/dev/types` | Leftover types from a dead dev server. Delete the `.next` folder and build again. |
 | An occasional `fetch failed` 500 on the first request | A transient network error between the server and Supabase. The app shows a retry notice; try again. |
 | Supabase says a table, policy or bucket already exists | You ran `supabase-schema.sql` twice. See the reset steps in section 2. |
+| A payment succeeds but the listing never shows **Sold** | The webhook isn't reaching the app. Check the endpoint is registered for your production URL, `STRIPE_WEBHOOK_SECRET` is set in Vercel and the app was redeployed. In Stripe, open Developers, Webhooks, and look at recent deliveries: `400` means the secret doesn't match, `503` means it isn't set. |
+| `/connect`, `/api/stripe/webhook` or `/order/success` return 404 on the live site | The deployment is out of date. Open Vercel's Deployments tab and check the latest commit built and is live. |
 
 ## Cleaning up test data
 
