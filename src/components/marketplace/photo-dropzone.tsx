@@ -10,7 +10,11 @@ import {
 import Image from "next/image";
 import { ImagePlusIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ALLOWED_IMAGE_MIME, MAX_PHOTO_BYTES } from "@/lib/listing-validation";
+import {
+  ALLOWED_IMAGE_MIME,
+  MAX_PHOTO_BYTES,
+  MAX_PHOTO_MB,
+} from "@/lib/listing-validation";
 
 export type Photo = { id: string; file: File; url: string };
 
@@ -44,7 +48,7 @@ export function PhotoDropzone({ photos, onChange }: PhotoDropzoneProps) {
         continue;
       }
       if (file.size > MAX_PHOTO_BYTES) {
-        problems.push(`${file.name} is larger than 5 MB.`);
+        problems.push(`${file.name} is larger than ${MAX_PHOTO_MB} MB.`);
         continue;
       }
       if (chosen) {
@@ -113,7 +117,7 @@ export function PhotoDropzone({ photos, onChange }: PhotoDropzoneProps) {
           {photo ? "Replace photo" : "Add a photo"}
         </span>
         <span className="text-sm text-muted-foreground">
-          Drag and drop, or click to browse. One image, up to 5 MB (JPEG, PNG, WebP or GIF).
+          Drag and drop, or click to browse. One image, up to {MAX_PHOTO_MB} MB (JPEG, PNG, WebP or GIF).
         </span>
         <input
           type="file"

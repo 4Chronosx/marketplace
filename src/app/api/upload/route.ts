@@ -1,6 +1,10 @@
 import { handleRouteError, jsonError } from "@/lib/api";
 import { dbUploadListingImage } from "@/lib/db";
-import { MAX_PHOTO_BYTES, detectImageType } from "@/lib/listing-validation";
+import {
+  MAX_PHOTO_BYTES,
+  MAX_PHOTO_MB,
+  detectImageType,
+} from "@/lib/listing-validation";
 
 // POST /api/upload  multipart/form-data with one image in the "file" field.
 export async function POST(request: Request) {
@@ -16,7 +20,7 @@ export async function POST(request: Request) {
     return jsonError(400, 'Attach an image in the "file" field.');
   }
   if (file.size > MAX_PHOTO_BYTES) {
-    return jsonError(413, "Image must be 5 MB or smaller.");
+    return jsonError(413, `Image must be ${MAX_PHOTO_MB} MB or smaller.`);
   }
 
   // Trust the file's bytes, not its declared type or name.

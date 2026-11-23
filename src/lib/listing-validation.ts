@@ -12,7 +12,9 @@ export const ALLOWED_IMAGE_MIME: readonly string[] = [
   "image/webp",
   "image/gif",
 ];
-export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+// Vercel Functions reject request bodies over about 4.5 MB, so stay under that.
+export const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
+export const MAX_PHOTO_MB = MAX_PHOTO_BYTES / (1024 * 1024);
 export const LIST_LIMIT_DEFAULT = 50;
 export const LIST_LIMIT_MAX = 100;
 
