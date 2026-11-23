@@ -16,6 +16,12 @@ export type Listing = {
   created_at: string;
 };
 
+/** What a card in the browse grid needs; GET /api/listings returns only this. */
+export type ListingSummary = Pick<
+  Listing,
+  "id" | "title" | "price" | "category" | "location" | "image_url" | "created_at"
+>;
+
 export function formatPrice(price: number): string {
   if (price === 0) return "Free";
   const fractionDigits = Number.isInteger(price) ? 0 : 2;

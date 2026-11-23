@@ -1,5 +1,5 @@
 // Browser-side client for our own /api routes (see src/app/api).
-import type { Listing } from "./listings";
+import type { Listing, ListingSummary } from "./listings";
 import { LIST_LIMIT_MAX, type NewListingPayload } from "./listing-validation";
 
 export class ApiRequestError extends Error {
@@ -51,11 +51,11 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 export async function fetchListings(
   filters: { category?: string; q?: string },
   signal?: AbortSignal,
-): Promise<Listing[]> {
+): Promise<ListingSummary[]> {
   const params = new URLSearchParams({ limit: String(LIST_LIMIT_MAX) });
   if (filters.category) params.set("category", filters.category);
   if (filters.q) params.set("q", filters.q);
-  const { listings } = await request<{ listings: Listing[] }>(
+  const { listings } = await request<{ listings: ListingSummary[] }>(
     `/api/listings?${params}`,
     { signal },
   );

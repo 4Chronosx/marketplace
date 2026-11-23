@@ -1,4 +1,4 @@
-import type { Listing } from "./listings";
+import type { Listing, ListingSummary } from "./listings";
 import type {
   DetectedImage,
   ListingQuery,
@@ -40,6 +40,7 @@ export type Message = {
 
 const LISTING_COLUMNS =
   "id, title, description, price, category, location, seller_name, seller_email, image_url, created_at";
+const SUMMARY_COLUMNS = "id, title, price, category, location, image_url, created_at";
 const MESSAGE_COLUMNS =
   "id, listing_id, buyer_email, seller_email, message, created_at";
 
@@ -56,6 +57,23 @@ type ListingRow = {
   created_at: string;
 };
 
+type SummaryRow = Pick<
+  ListingRow,
+  "id" | "title" | "price" | "category" | "location" | "image_url" | "created_at"
+>;
+
+function toSummary(row: SummaryRow): ListingSummary {
+  return {
+    id: row.id,
+    title: row.title,
+    price: Number(row.price),
+    category: row.category,
+    location: row.location ?? DEFAULT_LOCATION,
+    image_url: row.image_url,
+    created_at: row.created_at,
+  };
+}
+
 function toListing(row: ListingRow): Listing {
   return {
     id: row.id,
@@ -71,12 +89,16 @@ function toListing(row: ListingRow): Listing {
   };
 }
 
-export async function dbListListings(query: ListingQuery): Promise<Listing[]> {
+export async function dbListListings(
+  query: ListingQuery,
+): Promise<ListingSummary[]> {
   const { category, q, limit, offset } = query;
 
+  // Cards only need a few columns; skip the description and seller email.
+  // Search still matches on description in the database.
   let request = getSupabase()
     .from("listings")
-    .select(LISTING_COLUMNS)
+    .select(SUMMARY_COLUMNS)
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -86,7 +108,7 @@ export async function dbListListings(query: ListingQuery): Promise<Listing[]> {
 
   const { data, error } = await request;
   if (error) throw new DatabaseError(error);
-  return (data as unknown as ListingRow[]).map(toListing);
+  return (data as unknown as SummaryRow[]).map(toSummary);
 }
 
 export async function dbGetListing(id: string): Promise<Listing | null> {

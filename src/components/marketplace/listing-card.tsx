@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { formatPrice, type Listing } from "@/lib/listings";
+import { formatPrice, type ListingSummary } from "@/lib/listings";
 import { ListingImage } from "./listing-image";
 
-export function ListingCard({ listing }: { listing: Listing }) {
+export function ListingCard({ listing }: { listing: ListingSummary }) {
   return (
     <Link
       href={`/item/${listing.id}`}
