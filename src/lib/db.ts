@@ -167,6 +167,146 @@ export async function dbCreateMessage(input: NewMessagePayload): Promise<Message
   return data as unknown as Message;
 }
 
+// --- Payments (Stripe Connect) ---------------------------------------------
+// Same anon-key client as everything else. What it may write is limited by the
+// RLS policies and triggers in supabase-schema.sql, not by a privileged key.
+
+const UNIQUE_VIOLATION = "23505";
+
+export type StripeAccount = {
+  id: string;
+  /** Always lowercase. */
+  seller_email: string;
+  stripe_account_id: string;
+  details_submitted: boolean;
+  charges_enabled: boolean;
+  /** ISO 8601 */
+  created_at: string;
+  /** ISO 8601 */
+  updated_at: string;
+};
+
+export type Order = {
+  id: string;
+  listing_id: string;
+  buyer_email: string | null;
+  stripe_account_id: string;
+  stripe_session_id: string;
+  stripe_payment_intent_id: string | null;
+  /** Smallest currency unit (cents). */
+  amount_total: number;
+  /** Smallest currency unit (cents). */
+  application_fee: number;
+  currency: string;
+  /** ISO 8601 */
+  created_at: string;
+};
+
+export type NewOrder = Omit<Order, "id" | "created_at">;
+
+const STRIPE_ACCOUNT_COLUMNS =
+  "id, seller_email, stripe_account_id, details_submitted, charges_enabled, created_at, updated_at";
+const ORDER_COLUMNS =
+  "id, listing_id, buyer_email, stripe_account_id, stripe_session_id, stripe_payment_intent_id, amount_total, application_fee, currency, created_at";
+
+// listings.seller_email keeps the case the seller typed; stripe_accounts is
+// always lowercase, so lowercase before looking one up.
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+export async function dbGetStripeAccountByEmail(
+  email: string,
+): Promise<StripeAccount | null> {
+  const { data, error } = await getSupabase()
+    .from("stripe_accounts")
+    .select(STRIPE_ACCOUNT_COLUMNS)
+    .eq("seller_email", normalizeEmail(email))
+    .maybeSingle();
+  if (error) throw new DatabaseError(error);
+  return data as unknown as StripeAccount | null;
+}
+
+/** Lets the webhook tell its own connected accounts from other candidates'. */
+export async function dbGetStripeAccountById(
+  stripeAccountId: string,
+): Promise<StripeAccount | null> {
+  const { data, error } = await getSupabase()
+    .from("stripe_accounts")
+    .select(STRIPE_ACCOUNT_COLUMNS)
+    .eq("stripe_account_id", stripeAccountId)
+    .maybeSingle();
+  if (error) throw new DatabaseError(error);
+  return data as unknown as StripeAccount | null;
+}
+
+/**
+ * Saves a seller's connected account. If the email already has one, the saved
+ * row is returned untouched: the account id is never overwritten (a database
+ * trigger enforces that too). Use the returned `stripe_account_id`.
+ */
+export async function dbUpsertStripeAccount(input: {
+  seller_email: string;
+  stripe_account_id: string;
+}): Promise<StripeAccount> {
+  const sellerEmail = normalizeEmail(input.seller_email);
+  const { data, error } = await getSupabase()
+    .from("stripe_accounts")
+    .insert({ seller_email: sellerEmail, stripe_account_id: input.stripe_account_id })
+    .select(STRIPE_ACCOUNT_COLUMNS)
+    .single();
+  if (!error) return data as unknown as StripeAccount;
+
+  if (error.code === UNIQUE_VIOLATION) {
+    const existing = await dbGetStripeAccountByEmail(sellerEmail);
+    if (existing) return existing;
+  }
+  throw new DatabaseError(error);
+}
+
+/**
+ * Records a paid order. Stripe retries webhooks, so a repeat of the same
+ * Checkout session returns the saved order with `created: false`.
+ */
+export async function dbCreateOrder(
+  input: NewOrder,
+): Promise<{ order: Order; created: boolean }> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("orders")
+    .insert(input)
+    .select(ORDER_COLUMNS)
+    .single();
+  if (!error) return { order: data as unknown as Order, created: true };
+
+  if (error.code === UNIQUE_VIOLATION) {
+    const { data: existing, error: lookupError } = await supabase
+      .from("orders")
+      .select(ORDER_COLUMNS)
+      .eq("stripe_session_id", input.stripe_session_id)
+      .maybeSingle();
+    if (lookupError) throw new DatabaseError(lookupError);
+    if (existing) return { order: existing as unknown as Order, created: false };
+  }
+  throw new DatabaseError(error);
+}
+
+/**
+ * Marks an available listing Sold. Returns true if it changed and false if
+ * there was nothing to change (already sold, or no such listing). Create the
+ * order first: the database refuses to mark a listing sold without one.
+ */
+export async function dbMarkListingSold(listingId: string): Promise<boolean> {
+  const { data, error } = await getSupabase()
+    .from("listings")
+    .update({ status: "sold", sold_at: new Date().toISOString() })
+    .eq("id", listingId)
+    .eq("status", "available")
+    .select("id");
+  if (error) throw new DatabaseError(error);
+  return data.length > 0;
+}
+
 export async function dbUploadListingImage(
   file: File,
   image: DetectedImage,

@@ -28,10 +28,13 @@ This creates:
 - the `listings` and `messages` tables,
 - a public Storage bucket named `listing-images`,
 - indexes on `category`, `created_at` and `listing_id`,
-- Row Level Security policies (anyone can read and create; nobody can edit or delete through the anon key),
-- a trigger that keeps `listings.updated_at` current.
+- the `stripe_accounts` and `orders` tables for Stripe payments, and `status` and `sold_at` columns on `listings`,
+- Row Level Security policies (anyone can read and create; the anon key cannot edit or delete anything except to mark an available listing sold once an order exists, and to update a Stripe account's status),
+- triggers that keep `listings.updated_at` current and enforce those limits.
 
-Run it **once**. It is not idempotent: running it again fails because the tables, bucket and policies already exist. To start over, drop the `listings` and `messages` tables, delete the `listing-images` bucket and its policies, then run the file again.
+Run it **once**. It is not idempotent: running it again fails because the tables, bucket and policies already exist. To start over, drop the `orders`, `stripe_accounts`, `messages` and `listings` tables, delete the `listing-images` bucket and its policies, then run the file again.
+
+**Already have a database from before payments were added?** Do not re-run `supabase-schema.sql`. Run [`supabase-payments-migration.sql`](../supabase-payments-migration.sql) instead. It adds only the payment objects and is safe to run more than once. Run it before deploying code that reads or writes them.
 
 ## 3. Add the credentials
 
@@ -55,6 +58,22 @@ Rules for these two variables:
 - `.env.local` is gitignored. Do not commit it.
 
 Environment variables load at startup, so restart `npm run dev` after changing them.
+
+### Stripe (payments)
+
+Payments run in Stripe's sandbox (test mode). Add these to `.env.local` (see `.env.example`):
+
+```
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+```
+
+- `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are server-only. Never prefix them with `NEXT_PUBLIC_`.
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is the one variable meant for the browser.
+- Never commit a real key. `.env.local` is gitignored, and `.env.example` holds placeholders only.
+- Without these variables the app still builds and runs; payment routes answer `503` until they are set.
+- `STRIPE_WEBHOOK_SECRET` only exists after the webhook endpoint is registered, so leave it for later.
 
 ## 4. Run it
 
@@ -101,7 +120,7 @@ On Windows PowerShell, use `curl.exe` instead of `curl`. The full list of routes
 
 1. Push the repository to GitHub.
 2. In Vercel, choose **Add New, then Project**, and import the repository. The Next.js settings are detected automatically.
-3. Under **Environment Variables**, add `SUPABASE_URL` and `SUPABASE_ANON_KEY` (exact names) for all environments.
+3. Under **Environment Variables**, add `SUPABASE_URL` and `SUPABASE_ANON_KEY` (exact names) for all environments. For payments, also add `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
 4. Deploy.
 5. Smoke test the live URL: open the home page, create a listing with a photo, open it, and send a message. Check the new rows in the Supabase **Table Editor**.
 

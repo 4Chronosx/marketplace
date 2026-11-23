@@ -67,3 +67,44 @@ $$ language 'plpgsql';
 CREATE TRIGGER update_listings_updated_at BEFORE UPDATE ON listings
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); 
 ```
+
+## Payments (Stripe Connect)
+
+Added for the Stripe Connect feature. The full SQL, including policies and triggers, is in `supabase-schema.sql` (fresh install) and `supabase-payments-migration.sql` (existing database, safe to re-run).
+
+```sql
+-- listings: sold state
+ALTER TABLE listings ADD COLUMN status TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'sold'));
+ALTER TABLE listings ADD COLUMN sold_at TIMESTAMP WITH TIME ZONE;
+
+-- One connected Stripe account per seller email (emails are stored lowercase)
+CREATE TABLE stripe_accounts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  seller_email VARCHAR(255) NOT NULL UNIQUE CHECK (seller_email = lower(seller_email)),
+  stripe_account_id TEXT NOT NULL UNIQUE,
+  details_submitted BOOLEAN NOT NULL DEFAULT false,
+  charges_enabled BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- A row exists only after a payment is confirmed. Amounts are in cents.
+CREATE TABLE orders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE RESTRICT,
+  buyer_email VARCHAR(255),
+  stripe_account_id TEXT NOT NULL,
+  stripe_session_id TEXT NOT NULL UNIQUE,
+  stripe_payment_intent_id TEXT,
+  amount_total INTEGER NOT NULL CHECK (amount_total >= 0),
+  application_fee INTEGER NOT NULL CHECK (application_fee >= 0),
+  currency VARCHAR(3) NOT NULL DEFAULT 'usd',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+Access rules (all through the anon key, no `service_role`):
+
+- `stripe_accounts`: read, insert and update; no delete. A trigger blocks changing `seller_email` or `stripe_account_id`.
+- `orders`: read and insert; no update or delete.
+- `listings`: new rows must have `status = 'available'`. The anon role can update a listing only from `available` to `sold`, only when an order exists for it, and no other column may change (enforced by a trigger).

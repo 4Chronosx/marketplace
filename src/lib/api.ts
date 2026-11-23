@@ -1,4 +1,5 @@
 import { DatabaseError, NotFoundError } from "./db";
+import { StripeNotConfiguredError } from "./stripe";
 import { SupabaseNotConfiguredError } from "./supabase";
 
 /** `{ error: { message, fields? } }` with the given HTTP status. */
@@ -43,6 +44,9 @@ export async function readJson(request: Request): Promise<unknown> {
 export function handleRouteError(error: unknown): Response {
   if (error instanceof SupabaseNotConfiguredError) {
     return jsonError(503, "The database is not configured yet.");
+  }
+  if (error instanceof StripeNotConfiguredError) {
+    return jsonError(503, "Payments are not configured yet.");
   }
   if (error instanceof NotFoundError) {
     return jsonError(404, error.message);

@@ -33,11 +33,13 @@ src/
     listing-validation.ts      limits and validation shared by browser and server
     listings.ts                Listing and ListingSummary types, formatPrice
     supabase.ts                lazy server-only Supabase client
+    stripe.ts                  lazy server-only Stripe client
     db.ts                      typed database and storage queries
     api.ts                     response helpers for route handlers
     api-client.ts              browser fetch wrapper for /api
     use-api-resource.ts        data-loading hook
-supabase-schema.sql            tables, bucket, indexes, policies
+supabase-schema.sql            tables, bucket, indexes, policies, triggers (fresh install)
+supabase-payments-migration.sql  the payment objects only, idempotent (existing database)
 ```
 
 The two **route groups** in parentheses do not appear in URLs. `(browse)` wraps pages in the sidebar; `(focus)` is for flows (creating a listing, reading one) that should not show the category rail.
@@ -79,7 +81,10 @@ Browser component
 
 | Decision | Why |
 |---|---|
-| Anon key and Row Level Security only, never `service_role` | The API is public with no login, so the database itself must be safe. Policies allow read and insert, and no update or delete for anonymous users. |
+| Anon key and Row Level Security only, never `service_role` | The API is public with no login, so the database itself must be safe. Policies allow read and insert. The only anonymous updates are marking an available listing sold and updating a Stripe account's status (see the payment rows below). No deletes. |
+| Payments write through the anon key, limited by RLS and triggers | Chosen over a `service_role` key or `SECURITY DEFINER` functions. A trigger lets the `anon` role change a listing only from `available` to `sold`, and only once an order exists; nothing else on the listing can change. New listings must start `available`. |
+| A saved Stripe account cannot be re-pointed | A trigger rejects changes to `stripe_accounts.seller_email` and `stripe_account_id`, so nobody can redirect a seller's payouts. |
+| `orders.stripe_session_id` is unique | Stripe retries webhooks; `dbCreateOrder` treats a repeat as already recorded. |
 | Credentials only on the server | Nothing secret in the browser bundle. |
 | `seller_email` on a message is looked up from the listing | A caller cannot spoof who a message is for. |
 | Photos are checked by magic bytes, not name or declared type | A renamed file cannot sneak in; the stored content type comes from the detected type. |
@@ -88,7 +93,9 @@ Browser component
 | 500 errors are logged, never returned | No internals leak to callers. |
 | The list endpoint returns summaries only | Cards do not need the description or seller email. |
 
-Known and accepted by the schema: messages (with both emails) are publicly readable per listing id.
+Known and accepted by the schema: messages (with both emails) are publicly readable per listing id. Orders (with buyer email and amounts) and Stripe account ids are readable with the anon key too.
+
+Known and accepted for payments: the database cannot tell a verified Stripe webhook from any other caller holding the anon key. That key is server-only (no `NEXT_PUBLIC_`), so this holds as long as it stays secret. Someone who obtained it could create an order or mark an available listing sold, which the triggers make harder but cannot prevent. If that is no longer acceptable, move the webhook's writes behind a `service_role` key used in one server module.
 
 ## Performance decisions
 
