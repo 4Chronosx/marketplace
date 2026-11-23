@@ -12,6 +12,7 @@ export function ListingCard({ listing }: { listing: ListingSummary }) {
         <ListingImage
           src={listing.image_url}
           alt={listing.title}
+          fit="cover"
           className="transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
         />
       </div>

@@ -10,14 +10,17 @@ type ListingImageProps = {
   aspectClassName?: string;
   /** `sizes` hint for next/image; defaults to the browse grid's column widths. */
   sizes?: string;
+  /** "contain" shows the whole photo; "cover" fills the tile and crops the edges. */
+  fit?: "contain" | "cover";
 };
 
 // Matches LISTING_GRID_CLASSNAME: 1 column on phones, then 2 / 3 / 4 / 5.
 const GRID_SIZES =
   "(min-width: 1536px) 20vw, (min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw";
 
-// Image tile. The whole photo is shown (object-contain, never cropped); any
-// spare space is the brand-tinted background. With no photo it shows a brand-tinted placeholder. Remote
+// Image tile. By default the whole photo is shown (object-contain, never
+// cropped) and spare space is the brand-tinted background; grid cards pass
+// fit="cover" to fill the tile instead. With no photo it shows a brand-tinted placeholder. Remote
 // `src` values must match `images.remotePatterns` in next.config.ts (Supabase
 // Storage is configured there).
 export function ListingImage({
@@ -26,6 +29,7 @@ export function ListingImage({
   className,
   aspectClassName = "aspect-square",
   sizes = GRID_SIZES,
+  fit = "contain",
 }: ListingImageProps) {
   return (
     <div
@@ -41,7 +45,7 @@ export function ListingImage({
           alt={alt}
           fill
           sizes={sizes}
-          className="object-contain"
+          className={fit === "cover" ? "object-cover" : "object-contain"}
         />
       ) : (
         <ImageIcon aria-hidden="true" className="h-auto w-1/4" strokeWidth={1.5} />
