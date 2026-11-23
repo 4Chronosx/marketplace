@@ -1,5 +1,5 @@
 -- Supabase schema for the Marketplace app.
--- Source: docs/schema.md, plus `seller_name` on listings.
+-- Source: docs/SCHEMA.md, plus `seller_name` on listings.
 -- Run this ONCE in the Supabase SQL editor. It is not idempotent: running it
 -- again fails because the tables, bucket and policies already exist.
 
