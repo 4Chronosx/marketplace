@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import Stripe from "stripe";
+import { CURRENCY } from "./payments";
 
 export class StripeNotConfiguredError extends Error {
   constructor() {
@@ -52,14 +53,57 @@ export async function createConnectedAccount(email: string): Promise<string> {
   return account.id;
 }
 
+/**
+ * Opens a hosted Checkout page for one listing as a direct charge on the
+ * seller's connected account; `feeCents` is the marketplace's application fee.
+ * Returns the Checkout URL.
+ */
+export async function createCheckoutSession(input: {
+  stripeAccountId: string;
+  listingId: string;
+  title: string;
+  amountCents: number;
+  feeCents: number;
+  origin: string;
+}): Promise<string> {
+  const session = await getStripe().checkout.sessions.create(
+    {
+      mode: "payment",
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: CURRENCY,
+            unit_amount: input.amountCents,
+            product_data: { name: input.title },
+          },
+        },
+      ],
+      payment_intent_data: { application_fee_amount: input.feeCents },
+      client_reference_id: input.listingId,
+      metadata: { listing_id: input.listingId },
+      success_url: `${input.origin}/order/success?session_id={CHECKOUT_SESSION_ID}&listing_id=${input.listingId}`,
+      cancel_url: `${input.origin}/item/${input.listingId}`,
+    },
+    { stripeAccount: input.stripeAccountId },
+  );
+  if (!session.url) {
+    throw new Error("Stripe returned a Checkout Session without a URL.");
+  }
+  return session.url;
+}
+
 export type OnboardingLink =
   | { connected: true }
   | { connected: false; url: string };
 
 /**
- * A fresh hosted-onboarding link for a connected account. An account that has
- * already submitted its details gets no link: anyone who knows a seller's email
- * must not be able to reopen onboarding for a finished account.
+ * A fresh hosted-onboarding link for a connected account. An account that can
+ * already take payments gets no link: anyone who knows a seller's email must not
+ * be able to reopen onboarding for a finished account. "Finished" means
+ * `charges_enabled`, not `details_submitted`: an account can submit its details
+ * and still owe Stripe something (e.g. an ID number), and its owner needs a way
+ * back in to fix that.
  */
 export async function createOnboardingLink(
   accountId: string,
@@ -67,7 +111,7 @@ export async function createOnboardingLink(
 ): Promise<OnboardingLink> {
   const stripe = getStripe();
   const account = await stripe.accounts.retrieve(accountId);
-  if (account.details_submitted) return { connected: true };
+  if (account.charges_enabled) return { connected: true };
 
   const link = await stripe.accountLinks.create({
     account: accountId,

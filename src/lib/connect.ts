@@ -35,9 +35,9 @@ async function saveNewAccount(email: string): Promise<string> {
 }
 
 export type OnboardingStatus =
-  /** Stripe has the seller's details. */
+  /** Stripe can take payments for this seller. */
   | "connected"
-  /** Known account, onboarding not finished. */
+  /** Known account that can't take payments yet (onboarding not finished). */
   | "incomplete"
   /** Not an account saved by this app. */
   | "unknown"
@@ -52,7 +52,7 @@ export async function getOnboardingStatus(
     const known = await dbGetStripeAccountById(stripeAccountId);
     if (!known) return "unknown";
     const account = await getStripe().accounts.retrieve(stripeAccountId);
-    return account.details_submitted ? "connected" : "incomplete";
+    return account.charges_enabled ? "connected" : "incomplete";
   } catch (error) {
     console.error("Onboarding status check failed:", error);
     return "unavailable";

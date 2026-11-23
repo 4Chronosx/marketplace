@@ -1,5 +1,5 @@
 // Browser-side client for our own /api routes (see src/app/api).
-import type { Listing, ListingSummary } from "./listings";
+import type { Listing, ListingDetail, ListingSummary } from "./listings";
 import { LIST_LIMIT_MAX, type NewListingPayload } from "./listing-validation";
 
 export class ApiRequestError extends Error {
@@ -82,8 +82,8 @@ export async function fetchListings(
 export async function fetchListing(
   id: string,
   signal?: AbortSignal,
-): Promise<Listing> {
-  const { listing } = await request<{ listing: Listing }>(
+): Promise<ListingDetail> {
+  const { listing } = await request<{ listing: ListingDetail }>(
     `/api/listings/${encodeURIComponent(id)}`,
     { signal },
   );
@@ -103,6 +103,16 @@ export async function createListing(payload: NewListingPayload): Promise<Listing
     body: JSON.stringify(payload),
   });
   return listing;
+}
+
+/** Opens Stripe Checkout for a listing; resolves to the Checkout URL. */
+export async function startCheckout(listingId: string): Promise<string> {
+  const { url } = await request<{ url: string }>("/api/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ listing_id: listingId }),
+  });
+  return url;
 }
 
 export type OnboardingStart = { url: string } | { connected: true };

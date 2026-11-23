@@ -7,6 +7,7 @@ What the Marketplace does, the rules it enforces, and its API. To run it, see [S
 - [Listing page](#listing-page)
 - [Message the seller](#message-the-seller)
 - [Get paid with Stripe](#get-paid-with-stripe)
+- [Buy Now](#buy-now)
 - [Layout and navigation](#layout-and-navigation)
 - [Limits at a glance](#limits-at-a-glance)
 - [API reference](#api-reference)
@@ -80,8 +81,23 @@ Sellers connect a Stripe account (test mode) so buyers can pay them. Reached fro
 - The server creates a Stripe Standard account for that email (or reuses the one already saved) and sends you to Stripe's hosted onboarding. The account id is saved in `stripe_accounts`, keyed by the lowercased email. The same email never gets two accounts.
 - When you finish or leave Stripe you land on `/connect/return`, which checks your status with Stripe: **connected**, **not finished** (with a **Continue with Stripe** button), or a not-found message for an unknown account.
 - If an onboarding link expires, Stripe returns you through `/api/connect/refresh`, which makes a fresh link.
-- An email whose Stripe account already finished onboarding is never given a new link, so entering someone else's email cannot reopen their onboarding.
+- An email whose Stripe account can already take payments is never given a new link, so entering someone else's email cannot reopen their onboarding. An account that submitted its details but still owes Stripe something (for example an ID number) is not finished: it gets a fresh link so the seller can complete it.
 - Without Stripe configured, `/connect` shows "Payments can't be set up right now" and the API answers `503`.
+
+## Buy Now
+
+The listing page shows a **Buy Now** button under the price when the item can be bought, and a short reason when it can't.
+
+| Situation | What the page shows |
+|---|---|
+| Seller has connected Stripe | **Buy Now** |
+| Seller has not connected Stripe | "This seller hasn't set up online payments yet" (the message form is still there) |
+| Item already sold | "This item has been sold." |
+| Price under $0.50 (including Free) or over $999,999.99 | "This item can't be bought online." |
+
+- **Buy Now** opens Stripe Checkout for the listing's title and price. After paying, the buyer returns to `/order/success`; cancelling returns to the listing.
+- The payment is a **direct charge** on the seller's connected account. The marketplace keeps a **10% application fee** (`PLATFORM_FEE_RATE` in `src/lib/payments.ts`); the seller receives the rest, minus Stripe's own fees.
+- The server decides whether an item can be bought, not the page. It reads the price from the database (the request only carries the listing id), refuses a sold listing or an unconnected seller, and asks Stripe whether the seller's account can take payments yet. A seller who started onboarding but never finished is refused with "hasn't finished setting up payments".
 
 ## Layout and navigation
 
@@ -142,7 +158,7 @@ Creates a listing. Returns `201 { "listing": { … } }` with every field.
 
 ### `GET /api/listings/[id]`
 
-Returns `{ "listing": { … } }` with all fields, including `description`, `seller_name` and `seller_email`. A malformed or unknown id returns `404`. Cached for 60 seconds (`s-maxage=60, stale-while-revalidate=300`).
+Returns `{ "listing": { … } }` with all fields, including `description`, `seller_name`, `seller_email` and `status` (`available` or `sold`), plus `buy_status`: `ready`, `sold`, `no_seller_account` or `price_unsupported`. A malformed or unknown id returns `404`. Cached for 10 seconds (`s-maxage=10, stale-while-revalidate=30`), kept short because `buy_status` says whether the item can be bought right now.
 
 ### `POST /api/upload`
 
@@ -172,17 +188,25 @@ Returns `{ "messages": [ … ] }`, newest first. Note that messages, including b
 { "seller_email": "wei.gu@example.com" }
 ```
 
-Creates (or reuses) the seller's Stripe account and returns `{ "url": "https://connect.stripe.com/…" }` to send them to Stripe's onboarding. If that email already finished onboarding it returns `{ "connected": true }` instead. An invalid email returns `400`, Stripe failures `502`, missing configuration `503`.
+Creates (or reuses) the seller's Stripe account and returns `{ "url": "https://connect.stripe.com/…" }` to send them to Stripe's onboarding. If that email's account can already take payments it returns `{ "connected": true }` instead. An invalid email returns `400`, Stripe failures `502`, missing configuration `503`.
 
 ### `GET /api/connect/refresh?account=acct_…`
 
 Stripe's refresh URL. Redirects (`302`) to a fresh onboarding link for an account saved by this app. Anything else, or any failure, redirects to `/connect?error=refresh`.
 
+### `POST /api/checkout`
+
+```json
+{ "listing_id": "<uuid>" }
+```
+
+Returns `{ "url": "https://checkout.stripe.com/…" }`, the Stripe Checkout page for that listing. The price comes from the database. Statuses: `400` invalid id, `404` unknown listing, `409` the listing can't be bought (sold, seller not connected or not finished onboarding, price Stripe can't charge), `502` Stripe failed, `503` Stripe or the database not configured.
+
 ### Data model
 
-`listings`: `id`, `title`, `description`, `price`, `category` (slug), `seller_name`, `seller_email`, `image_url`, `location`, `created_at`, `updated_at`.
+`listings`: `id`, `title`, `description`, `price`, `category` (slug), `seller_name`, `seller_email`, `image_url`, `location`, `status`, `sold_at`, `created_at`, `updated_at`.
 `messages`: `id`, `listing_id` (deleted with its listing), `buyer_email`, `seller_email`, `message`, `created_at`.
-`stripe_accounts`: `id`, `seller_email` (lowercase, unique), `stripe_account_id` (unique), `details_submitted`, `charges_enabled`, `created_at`, `updated_at`. Also `orders`, and `status` / `sold_at` on `listings`; see [SCHEMA.md](SCHEMA.md#payments-stripe-connect).
+`stripe_accounts`: `id`, `seller_email` (lowercase, unique), `stripe_account_id` (unique), `details_submitted`, `charges_enabled`, `created_at`, `updated_at`. Also `orders`; see [SCHEMA.md](SCHEMA.md#payments-stripe-connect).
 Photos live in the public Storage bucket `listing-images`. The full SQL is in [`supabase-schema.sql`](../supabase-schema.sql).
 
 ## Not included

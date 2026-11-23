@@ -39,7 +39,7 @@ export type Message = {
 };
 
 const LISTING_COLUMNS =
-  "id, title, description, price, category, location, seller_name, seller_email, image_url, created_at";
+  "id, title, description, price, category, location, seller_name, seller_email, image_url, status, created_at";
 const SUMMARY_COLUMNS = "id, title, price, category, location, image_url, created_at";
 const MESSAGE_COLUMNS =
   "id, listing_id, buyer_email, seller_email, message, created_at";
@@ -54,6 +54,7 @@ type ListingRow = {
   seller_name: string;
   seller_email: string;
   image_url: string | null;
+  status: "available" | "sold";
   created_at: string;
 };
 
@@ -85,6 +86,7 @@ function toListing(row: ListingRow): Listing {
     seller_name: row.seller_name,
     seller_email: row.seller_email,
     image_url: row.image_url,
+    status: row.status,
     created_at: row.created_at,
   };
 }

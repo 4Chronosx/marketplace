@@ -1,8 +1,10 @@
 import { cachedJson, handleRouteError, jsonError } from "@/lib/api";
-import { dbGetListing } from "@/lib/db";
+import { dbGetListing, dbGetStripeAccountByEmail } from "@/lib/db";
 import { isUuid } from "@/lib/listing-validation";
+import type { ListingDetail } from "@/lib/listings";
+import { getBuyStatus } from "@/lib/payments";
 
-// GET /api/listings/[id]
+// GET /api/listings/[id]  (the listing plus `buy_status`: can it be bought now?)
 export async function GET(
   _request: Request,
   ctx: RouteContext<"/api/listings/[id]">,
@@ -13,7 +15,12 @@ export async function GET(
   try {
     const listing = await dbGetListing(id);
     if (!listing) return jsonError(404, "Listing not found.");
-    return cachedJson({ listing }, "detail");
+    const account = await dbGetStripeAccountByEmail(listing.seller_email);
+    const detail: ListingDetail = {
+      ...listing,
+      buy_status: getBuyStatus(listing, account !== null),
+    };
+    return cachedJson({ listing: detail }, "detail");
   } catch (error) {
     return handleRouteError(error);
   }

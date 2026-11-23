@@ -1,3 +1,5 @@
+import type { BuyStatus } from "./payments";
+
 // Mirrors the `listings` table (see supabase-schema.sql). Data is loaded from
 // the /api routes in the browser (src/lib/api-client.ts) and queried on the
 // server in src/lib/db.ts.
@@ -12,9 +14,16 @@ export type Listing = {
   seller_name: string;
   seller_email: string;
   image_url: string | null;
+  /** `sold` once a payment is confirmed (see supabase-schema.sql). */
+  status: ListingStatus;
   /** ISO 8601 */
   created_at: string;
 };
+
+export type ListingStatus = "available" | "sold";
+
+/** `GET /api/listings/[id]`: the listing plus whether it can be bought now. */
+export type ListingDetail = Listing & { buy_status: BuyStatus };
 
 /** What a card in the browse grid needs; GET /api/listings returns only this. */
 export type ListingSummary = Pick<

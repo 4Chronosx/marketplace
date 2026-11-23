@@ -8,6 +8,7 @@ import { categoryHref, getCategoryBySlug } from "@/lib/categories";
 import { isUuid } from "@/lib/listing-validation";
 import { formatPrice } from "@/lib/listings";
 import { useApiResource } from "@/lib/use-api-resource";
+import { BuyNow } from "./buy-now";
 import { ListedTime } from "./listed-time";
 import { ListingImage } from "./listing-image";
 import { MessageForm } from "./message-form";
@@ -96,6 +97,8 @@ export function ItemDetails({ id }: { id: string }) {
               Listed <ListedTime iso={listing.created_at} /> in {listing.location}
             </p>
           </div>
+
+          <BuyNow listingId={listing.id} buyStatus={listing.buy_status} />
 
           <section aria-labelledby="description-heading">
             <h2 id="description-heading" className="text-sm font-medium">

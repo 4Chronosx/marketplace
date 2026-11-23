@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,16 @@ export function ConnectForm({ notice }: ConnectFormProps) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [connected, setConnected] = useState(false);
+
+  // Coming back from Stripe with the browser's back button can restore this page
+  // exactly as it was left, with the button still busy.
+  useEffect(() => {
+    const reset = (event: PageTransitionEvent) => {
+      if (event.persisted) setWorking(false);
+    };
+    window.addEventListener("pageshow", reset);
+    return () => window.removeEventListener("pageshow", reset);
+  }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

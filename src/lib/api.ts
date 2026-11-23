@@ -1,4 +1,5 @@
 import { DatabaseError, NotFoundError } from "./db";
+import { PurchaseNotAllowedError } from "./payments";
 import { StripeNotConfiguredError, isStripeError } from "./stripe";
 import { SupabaseNotConfiguredError } from "./supabase";
 
@@ -18,7 +19,8 @@ export function jsonError(
 // user never sees a stale page from their own cache. Used on successful GETs only.
 const CACHE_POLICIES = {
   list: "public, s-maxage=15, stale-while-revalidate=60",
-  detail: "public, s-maxage=60, stale-while-revalidate=300",
+  // Short: the detail response says whether the item can be bought right now.
+  detail: "public, s-maxage=10, stale-while-revalidate=30",
 } as const;
 
 /** `Response.json` with a CDN cache policy. */
@@ -50,6 +52,10 @@ export function handleRouteError(error: unknown): Response {
   }
   if (error instanceof NotFoundError) {
     return jsonError(404, error.message);
+  }
+  // The listing can't be bought right now (sold, seller not set up, ...).
+  if (error instanceof PurchaseNotAllowedError) {
+    return jsonError(409, error.message);
   }
   // Postgres foreign key violation: the referenced listing doesn't exist.
   if (error instanceof DatabaseError && error.code === "23503") {

@@ -262,6 +262,21 @@ export function validateMessagesQuery(
   return { ok: true, data: { listing_id: listingId } };
 }
 
+export function validateCheckoutPayload(
+  body: unknown,
+): ValidationResult<{ listing_id: string }> {
+  if (!isRecord(body)) {
+    return { ok: false, errors: { body: "Send a JSON object." } };
+  }
+  if (!isUuid(body.listing_id)) {
+    return {
+      ok: false,
+      errors: { listing_id: "listing_id must be a valid listing id." },
+    };
+  }
+  return { ok: true, data: { listing_id: body.listing_id } };
+}
+
 export type ConnectPayload = { seller_email: string };
 
 const EMAIL_MAX = 255;
