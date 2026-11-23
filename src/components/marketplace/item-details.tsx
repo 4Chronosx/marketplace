@@ -85,6 +85,7 @@ export function ItemDetails({ id }: { id: string }) {
           src={listing.image_url}
           alt={listing.title}
           aspectClassName="aspect-4/3"
+          sizes="(min-width: 1024px) 60vw, 100vw"
         />
 
         <div className="flex flex-col gap-6">

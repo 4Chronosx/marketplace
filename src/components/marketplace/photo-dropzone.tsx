@@ -142,7 +142,7 @@ export function PhotoDropzone({ photos, onChange }: PhotoDropzoneProps) {
               fill
               unoptimized
               sizes="96px"
-              className="object-cover"
+              className="object-contain"
             />
             <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 text-[10px] text-white">
               Cover
