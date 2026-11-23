@@ -268,6 +268,26 @@ export async function dbUpsertStripeAccount(input: {
 }
 
 /**
+ * Saves what Stripe says about a connected account: whether the seller has
+ * submitted their details and can take charges. Only these two flags change;
+ * the email and account id are frozen by a database trigger. Returns null for
+ * an account this app didn't save.
+ */
+export async function dbUpdateStripeAccountStatus(
+  stripeAccountId: string,
+  status: { details_submitted: boolean; charges_enabled: boolean },
+): Promise<StripeAccount | null> {
+  const { data, error } = await getSupabase()
+    .from("stripe_accounts")
+    .update(status)
+    .eq("stripe_account_id", stripeAccountId)
+    .select(STRIPE_ACCOUNT_COLUMNS)
+    .maybeSingle();
+  if (error) throw new DatabaseError(error);
+  return data as unknown as StripeAccount | null;
+}
+
+/**
  * Records a paid order. Stripe retries webhooks, so a repeat of the same
  * Checkout session returns the saved order with `created: false`.
  */

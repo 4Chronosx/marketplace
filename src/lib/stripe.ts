@@ -121,9 +121,10 @@ export async function createCheckoutSession(input: {
   return session.url;
 }
 
+/** `account` is the live Stripe account the answer was based on, so callers can save its status. */
 export type OnboardingLink =
-  | { connected: true }
-  | { connected: false; url: string };
+  | { connected: true; account: Stripe.Account }
+  | { connected: false; url: string; account: Stripe.Account };
 
 /**
  * A fresh hosted-onboarding link for a connected account. An account that can
@@ -139,7 +140,7 @@ export async function createOnboardingLink(
 ): Promise<OnboardingLink> {
   const stripe = getStripe();
   const account = await stripe.accounts.retrieve(accountId);
-  if (account.charges_enabled) return { connected: true };
+  if (account.charges_enabled) return { connected: true, account };
 
   const link = await stripe.accountLinks.create({
     account: accountId,
@@ -147,5 +148,5 @@ export async function createOnboardingLink(
     return_url: `${origin}/connect/return?account=${accountId}`,
     refresh_url: `${origin}/api/connect/refresh?account=${accountId}`,
   });
-  return { connected: false, url: link.url };
+  return { connected: false, url: link.url, account };
 }

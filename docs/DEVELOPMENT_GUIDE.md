@@ -97,6 +97,7 @@ Browser component
 | Checkout takes only a listing id | The price, the fee and the seller's account are all read server-side, so a request cannot choose what it pays or who gets paid. |
 | The webhook verifies Stripe's signature on the raw body before anything else | Nobody can post a fake "payment completed" to `/api/stripe/webhook`. It reads `request.text()`, never `request.json()`, because parsing changes the bytes the signature covers. |
 | The webhook ignores anything it doesn't recognise, and still answers 200 | The sandbox is shared, so it also receives other apps' events. Unknown accounts, listings, unpaid sessions and a session whose account doesn't own the listing record nothing. |
+| The saved `charges_enabled` flag is a display hint; Stripe is the authority | Anyone with the anon key can edit the flag, so it only decides whether the page shows Buy Now. Checkout reads the account from Stripe before taking a payment, and `account.updated` re-reads it from Stripe instead of trusting the event body. |
 | `orders.stripe_session_id` is unique | Stripe retries webhooks; `dbCreateOrder` treats a repeat as already recorded. |
 | Credentials only on the server | Nothing secret in the browser bundle. |
 | `seller_email` on a message is looked up from the listing | A caller cannot spoof who a message is for. |

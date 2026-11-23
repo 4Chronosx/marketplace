@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import { ArrowLeftIcon, CheckIcon, Loader2Icon } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { getOnboardingStatus, type OnboardingStatus } from "@/lib/connect";
@@ -39,6 +40,9 @@ export default function ConnectReturnPage({
 async function ReturnContent({
   searchParams,
 }: Pick<PageProps<"/connect/return">, "searchParams">) {
+  // This reads Stripe and the database (and saves the status), so wait for a real
+  // request: prerendering must stop here.
+  await connection();
   const { account } = await searchParams;
   if (!isStripeAccountId(account)) return <Result status="unknown" />;
   return <Result status={await getOnboardingStatus(account)} account={account} />;

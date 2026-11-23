@@ -1,3 +1,4 @@
+import { persistAccountStatus } from "@/lib/connect";
 import { dbGetStripeAccountById } from "@/lib/db";
 import { validateAccountParam } from "@/lib/listing-validation";
 import { createOnboardingLink } from "@/lib/stripe";
@@ -18,6 +19,7 @@ export async function GET(request: Request) {
     const known = await dbGetStripeAccountById(query.data.account);
     if (known) {
       const result = await createOnboardingLink(known.stripe_account_id, origin);
+      await persistAccountStatus(result.account);
       target = result.connected
         ? `${origin}/connect/return?account=${known.stripe_account_id}`
         : result.url;

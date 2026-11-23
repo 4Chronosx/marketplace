@@ -85,6 +85,7 @@ Sellers connect a Stripe account (test mode) so buyers can pay them. Reached fro
 - The server creates a Stripe Standard account for that email (or reuses the one already saved) and sends you to Stripe's hosted onboarding. The account id is saved in `stripe_accounts`, keyed by the lowercased email. The same email never gets two accounts.
 - When you finish or leave Stripe you land on `/connect/return`, which checks your status with Stripe: **connected**, **not finished** (with a **Continue with Stripe** button), or a not-found message for an unknown account.
 - If an onboarding link expires, Stripe returns you through `/api/connect/refresh`, which makes a fresh link.
+- Whether a seller can take payments (`charges_enabled`) is saved on their `stripe_accounts` row, and that saved flag decides whether **Buy Now** shows. It is kept up to date three ways: Stripe's `account.updated` webhook, the return page (as soon as the seller comes back from Stripe), and entering the email again on `/connect`. Checkout still asks Stripe directly before taking a payment, so a stale flag can never let a payment through.
 - An email whose Stripe account can already take payments is never given a new link, so entering someone else's email cannot reopen their onboarding. An account that submitted its details but still owes Stripe something (for example an ID number) is not finished: it gets a fresh link so the seller can complete it.
 - Without Stripe configured, `/connect` shows "Payments can't be set up right now" and the API answers `503`.
 
@@ -94,8 +95,9 @@ The listing page shows a **Buy Now** button under the price when the item can be
 
 | Situation | What the page shows |
 |---|---|
-| Seller has connected Stripe | **Buy Now** |
+| Seller's Stripe account can take payments | **Buy Now** |
 | Seller has not connected Stripe | "This seller hasn't set up online payments yet" (the message form is still there) |
+| Seller connected Stripe but hasn't finished its setup | "This seller hasn't finished setting up payments yet" |
 | Item already sold | "This item has been sold." |
 | Price under $0.50 (including Free) or over $999,999.99 | "This item can't be bought online." |
 
@@ -112,6 +114,7 @@ Stripe tells the marketplace when a payment goes through by calling `POST /api/s
 - Stripe may deliver an event more than once. A repeat never creates a second order.
 - The test sandbox is shared with other apps, so the endpoint also receives events that aren't ours: unknown accounts, unknown listings, unpaid sessions and other event types. All of these are ignored and answered `200`.
 - If two buyers pay for the same listing, both orders are recorded and a warning is logged so the second payment can be refunded by hand.
+- `account.updated` (a seller's Stripe account changed) refreshes that seller's saved status. Events can arrive late or out of order, so the handler reads the account's current state from Stripe instead of trusting the event. Accounts this app didn't save are ignored before any Stripe call.
 
 ## Order confirmation
 
@@ -181,7 +184,7 @@ Creates a listing. Returns `201 { "listing": { … } }` with every field.
 
 ### `GET /api/listings/[id]`
 
-Returns `{ "listing": { … } }` with all fields, including `description`, `seller_name`, `seller_email` and `status` (`available` or `sold`), plus `buy_status`: `ready`, `sold`, `no_seller_account` or `price_unsupported`. A malformed or unknown id returns `404`. Cached for 10 seconds (`s-maxage=10, stale-while-revalidate=30`), kept short because `buy_status` says whether the item can be bought right now.
+Returns `{ "listing": { … } }` with all fields, including `description`, `seller_name`, `seller_email` and `status` (`available` or `sold`), plus `buy_status`: `ready`, `sold`, `no_seller_account`, `seller_not_ready` or `price_unsupported`. A malformed or unknown id returns `404`. Cached for 10 seconds (`s-maxage=10, stale-while-revalidate=30`), kept short because `buy_status` says whether the item can be bought right now.
 
 ### `POST /api/upload`
 

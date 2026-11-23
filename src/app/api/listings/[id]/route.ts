@@ -2,7 +2,7 @@ import { cachedJson, handleRouteError, jsonError } from "@/lib/api";
 import { dbGetListing, dbGetStripeAccountByEmail } from "@/lib/db";
 import { isUuid } from "@/lib/listing-validation";
 import type { ListingDetail } from "@/lib/listings";
-import { getBuyStatus } from "@/lib/payments";
+import { getBuyStatus, sellerPaymentsOf } from "@/lib/payments";
 
 // GET /api/listings/[id]  (the listing plus `buy_status`: can it be bought now?)
 export async function GET(
@@ -18,7 +18,7 @@ export async function GET(
     const account = await dbGetStripeAccountByEmail(listing.seller_email);
     const detail: ListingDetail = {
       ...listing,
-      buy_status: getBuyStatus(listing, account !== null),
+      buy_status: getBuyStatus(listing, sellerPaymentsOf(account)),
     };
     return cachedJson({ listing: detail }, "detail");
   } catch (error) {

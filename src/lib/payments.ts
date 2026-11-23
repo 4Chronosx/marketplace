@@ -28,19 +28,31 @@ export type BuyStatus =
   | "ready"
   | "sold"
   | "no_seller_account"
+  | "seller_not_ready"
   | "price_unsupported";
+
+/** What we know about a seller's Stripe account: none saved, saved but can't take charges yet, or ready. */
+export type SellerPayments = "none" | "not_ready" | "ready";
+
+export function sellerPaymentsOf(
+  account: { charges_enabled: boolean } | null,
+): SellerPayments {
+  if (account === null) return "none";
+  return account.charges_enabled ? "ready" : "not_ready";
+}
 
 export function getBuyStatus(
   listing: { status: "available" | "sold"; price: number },
-  hasSellerAccount: boolean,
+  seller: SellerPayments,
 ): BuyStatus {
   if (listing.status === "sold") return "sold";
   if (!isChargeable(listing.price)) return "price_unsupported";
-  if (!hasSellerAccount) return "no_seller_account";
+  if (seller === "none") return "no_seller_account";
+  if (seller === "not_ready") return "seller_not_ready";
   return "ready";
 }
 
-export type PurchaseRefusal = Exclude<BuyStatus, "ready"> | "seller_not_ready";
+export type PurchaseRefusal = Exclude<BuyStatus, "ready">;
 
 const REFUSAL_MESSAGES: Record<PurchaseRefusal, string> = {
   sold: "This item has already been sold.",

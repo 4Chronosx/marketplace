@@ -10,6 +10,8 @@ const UNAVAILABLE_TEXT: Record<Exclude<BuyStatus, "ready">, string> = {
   sold: "This item has been sold.",
   no_seller_account:
     "This seller hasn't set up online payments yet. You can message them below.",
+  seller_not_ready:
+    "This seller hasn't finished setting up payments yet. You can message them below.",
   price_unsupported:
     "This item can't be bought online. You can message the seller below.",
 };
