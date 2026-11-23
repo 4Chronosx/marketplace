@@ -27,6 +27,7 @@ src/
       connect/route.ts         POST (start Stripe onboarding)
       connect/refresh/route.ts GET (fresh onboarding link, redirects)
       checkout/route.ts        POST (open Stripe Checkout for a listing)
+      stripe/webhook/route.ts  POST (Stripe events: record the order, mark Sold)
   components/
     layout/                    header, sidebar, mobile-nav, category-list
     marketplace/               item-grid, listing-card, item-details, create-item-form, message-form, ...
@@ -40,6 +41,7 @@ src/
     connect.ts                 seller onboarding: Stripe account + saved row, status check
     payments.ts                fee rate, currency, cents math, BuyStatus (shared by browser and server)
     checkout.ts                Buy Now: can this listing be bought, then open Checkout
+    webhook.ts                 what to do with a verified Stripe event (order + Sold)
     db.ts                      typed database and storage queries
     api.ts                     response helpers for route handlers
     api-client.ts              browser fetch wrapper for /api
@@ -91,6 +93,8 @@ Browser component
 | Payments write through the anon key, limited by RLS and triggers | Chosen over a `service_role` key or `SECURITY DEFINER` functions. A trigger lets the `anon` role change a listing only from `available` to `sold`, and only once an order exists; nothing else on the listing can change. New listings must start `available`. |
 | A saved Stripe account cannot be re-pointed | A trigger rejects changes to `stripe_accounts.seller_email` and `stripe_account_id`, so nobody can redirect a seller's payouts. |
 | Checkout takes only a listing id | The price, the fee and the seller's account are all read server-side, so a request cannot choose what it pays or who gets paid. |
+| The webhook verifies Stripe's signature on the raw body before anything else | Nobody can post a fake "payment completed" to `/api/stripe/webhook`. It reads `request.text()`, never `request.json()`, because parsing changes the bytes the signature covers. |
+| The webhook ignores anything it doesn't recognise, and still answers 200 | The sandbox is shared, so it also receives other apps' events. Unknown accounts, listings, unpaid sessions and a session whose account doesn't own the listing record nothing. |
 | `orders.stripe_session_id` is unique | Stripe retries webhooks; `dbCreateOrder` treats a repeat as already recorded. |
 | Credentials only on the server | Nothing secret in the browser bundle. |
 | `seller_email` on a message is looked up from the listing | A caller cannot spoof who a message is for. |

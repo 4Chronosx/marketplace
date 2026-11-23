@@ -3,8 +3,8 @@ import Stripe from "stripe";
 import { CURRENCY } from "./payments";
 
 export class StripeNotConfiguredError extends Error {
-  constructor() {
-    super("Stripe is not configured. Set STRIPE_SECRET_KEY.");
+  constructor(variable = "STRIPE_SECRET_KEY") {
+    super(`Stripe is not configured. Set ${variable}.`);
     this.name = "StripeNotConfiguredError";
   }
 }
@@ -26,6 +26,34 @@ export function getStripe(): Stripe {
 
 export function isStripeError(error: unknown): error is Stripe.errors.StripeError {
   return error instanceof Stripe.errors.StripeError;
+}
+
+/** True when a webhook's signature didn't match (forged, altered or wrong secret). */
+export function isSignatureError(error: unknown): boolean {
+  return error instanceof Stripe.errors.StripeSignatureVerificationError;
+}
+
+/**
+ * Verifies a webhook against STRIPE_WEBHOOK_SECRET and returns the event.
+ * `rawBody` must be the request body exactly as received.
+ */
+export function constructWebhookEvent(rawBody: string, signature: string): Stripe.Event {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!secret) throw new StripeNotConfiguredError("STRIPE_WEBHOOK_SECRET");
+  return getStripe().webhooks.constructEvent(rawBody, signature, secret);
+}
+
+/** The application fee Stripe actually took on a connected account's payment. */
+export async function retrievePaymentIntentFee(
+  paymentIntentId: string,
+  stripeAccountId: string,
+): Promise<number> {
+  const intent = await getStripe().paymentIntents.retrieve(
+    paymentIntentId,
+    {},
+    { stripeAccount: stripeAccountId },
+  );
+  return intent.application_fee_amount ?? 0;
 }
 
 /**

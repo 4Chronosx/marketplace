@@ -8,6 +8,7 @@ What the Marketplace does, the rules it enforces, and its API. To run it, see [S
 - [Message the seller](#message-the-seller)
 - [Get paid with Stripe](#get-paid-with-stripe)
 - [Buy Now](#buy-now)
+- [Payment confirmation](#payment-confirmation)
 - [Layout and navigation](#layout-and-navigation)
 - [Limits at a glance](#limits-at-a-glance)
 - [API reference](#api-reference)
@@ -98,6 +99,16 @@ The listing page shows a **Buy Now** button under the price when the item can be
 - **Buy Now** opens Stripe Checkout for the listing's title and price. After paying, the buyer returns to `/order/success`; cancelling returns to the listing.
 - The payment is a **direct charge** on the seller's connected account. The marketplace keeps a **10% application fee** (`PLATFORM_FEE_RATE` in `src/lib/payments.ts`); the seller receives the rest, minus Stripe's own fees.
 - The server decides whether an item can be bought, not the page. It reads the price from the database (the request only carries the listing id), refuses a sold listing or an unconnected seller, and asks Stripe whether the seller's account can take payments yet. A seller who started onboarding but never finished is refused with "hasn't finished setting up payments".
+
+## Payment confirmation
+
+Stripe tells the marketplace when a payment goes through by calling `POST /api/stripe/webhook`. That call, not the buyer's browser, is what makes a purchase official.
+
+- Every call is checked against Stripe's signature (`STRIPE_WEBHOOK_SECRET`). A missing or wrong signature is rejected with `400`.
+- For a paid session on a listing whose seller is one of ours, it saves **one order** (amount, the fee Stripe actually took, buyer email, Stripe ids) and marks the listing **Sold**.
+- Stripe may deliver an event more than once. A repeat never creates a second order.
+- The test sandbox is shared with other apps, so the endpoint also receives events that aren't ours: unknown accounts, unknown listings, unpaid sessions and other event types. All of these are ignored and answered `200`.
+- If two buyers pay for the same listing, both orders are recorded and a warning is logged so the second payment can be refunded by hand.
 
 ## Layout and navigation
 
@@ -201,6 +212,10 @@ Stripe's refresh URL. Redirects (`302`) to a fresh onboarding link for an accoun
 ```
 
 Returns `{ "url": "https://checkout.stripe.com/…" }`, the Stripe Checkout page for that listing. The price comes from the database. Statuses: `400` invalid id, `404` unknown listing, `409` the listing can't be bought (sold, seller not connected or not finished onboarding, price Stripe can't charge), `502` Stripe failed, `503` Stripe or the database not configured.
+
+### `POST /api/stripe/webhook`
+
+Called by Stripe, not by the site. Needs the `Stripe-Signature` header and the raw JSON body Stripe sent. Answers `200 { "received": true }` for any verified event (acted on or ignored), `400` for a missing or invalid signature, `503` if `STRIPE_WEBHOOK_SECRET` isn't set, and `5xx` if saving fails (Stripe then retries).
 
 ### Data model
 

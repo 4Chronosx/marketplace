@@ -73,7 +73,15 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is the one variable meant for the browser.
 - Never commit a real key. `.env.local` is gitignored, and `.env.example` holds placeholders only.
 - Without these variables the app still builds and runs; payment routes answer `503` until they are set.
-- `STRIPE_WEBHOOK_SECRET` only exists after the webhook endpoint is registered, so leave it for later.
+- `STRIPE_WEBHOOK_SECRET` verifies that webhook calls really come from Stripe. Without it `/api/stripe/webhook` answers `503`.
+
+**Webhook secret for local development.** Install the [Stripe CLI](https://docs.stripe.com/stripe-cli), then in a second terminal while `npm run dev` runs:
+
+```bash
+stripe listen --api-key <your sk_test_ key> --forward-connect-to localhost:3000/api/stripe/webhook
+```
+
+It prints `Ready! Your webhook signing secret is whsec_...`. Put that value in `.env.local` as `STRIPE_WEBHOOK_SECRET` and restart `npm run dev`. The secret is temporary and only works while `stripe listen` runs. `--forward-connect-to` matters: payments are made on the seller's connected account, so their events are Connect events. For the deployed site the endpoint is registered with Stripe once and gets a permanent secret.
 
 ## 4. Run it
 
