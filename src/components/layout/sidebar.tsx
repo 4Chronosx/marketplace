@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { PlusIcon } from "lucide-react";
+import { CreditCardIcon, PlusIcon } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CategoryList, CategoryListFallback } from "./category-list";
@@ -21,6 +21,14 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
       >
         <PlusIcon aria-hidden="true" />
         Create new listing
+      </Link>
+      <Link
+        href="/connect"
+        onClick={onNavigate}
+        className={cn(buttonVariants({ size: "lg", variant: "outline" }), "mt-2 w-full")}
+      >
+        <CreditCardIcon aria-hidden="true" />
+        Connect with Stripe
       </Link>
       <nav aria-label="Categories">
         <h2 className="px-2 pt-6 pb-3 text-lg font-bold">Categories</h2>

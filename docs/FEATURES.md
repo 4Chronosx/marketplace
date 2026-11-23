@@ -6,6 +6,7 @@ What the Marketplace does, the rules it enforces, and its API. To run it, see [S
 - [Browse, filter and search](#browse-filter-and-search)
 - [Listing page](#listing-page)
 - [Message the seller](#message-the-seller)
+- [Get paid with Stripe](#get-paid-with-stripe)
 - [Layout and navigation](#layout-and-navigation)
 - [Limits at a glance](#limits-at-a-glance)
 - [API reference](#api-reference)
@@ -71,6 +72,17 @@ The form on the listing page asks for **your email** (required) and a **message*
 - Errors appear next to the field. A listing that was removed in the meantime, or a database that is not configured, gets its own message.
 - Sending a real email to the seller is **not** part of this version; messages are only stored.
 
+## Get paid with Stripe
+
+Sellers connect a Stripe account (test mode) so buyers can pay them. Reached from **Connect with Stripe** in the sidebar, or the link at the bottom of `/create`.
+
+- Enter the email you use on your listings at `/connect`. There is no login, so the email is how a seller is identified.
+- The server creates a Stripe Standard account for that email (or reuses the one already saved) and sends you to Stripe's hosted onboarding. The account id is saved in `stripe_accounts`, keyed by the lowercased email. The same email never gets two accounts.
+- When you finish or leave Stripe you land on `/connect/return`, which checks your status with Stripe: **connected**, **not finished** (with a **Continue with Stripe** button), or a not-found message for an unknown account.
+- If an onboarding link expires, Stripe returns you through `/api/connect/refresh`, which makes a fresh link.
+- An email whose Stripe account already finished onboarding is never given a new link, so entering someone else's email cannot reopen their onboarding.
+- Without Stripe configured, `/connect` shows "Payments can't be set up right now" and the API answers `503`.
+
 ## Layout and navigation
 
 - A header with the brand. On desktop a sidebar holds **Create new listing** and the category list; on mobile the sidebar becomes a slide-out menu.
@@ -99,7 +111,7 @@ All routes return JSON. Errors always have the same shape:
 { "error": { "message": "Invalid listing.", "fields": { "title": "Enter a title." } } }
 ```
 
-`fields` is present only for validation errors. Common statuses: `400` invalid input, `404` not found, `413` photo too large, `415` not an image, `503` database not configured, `500` unexpected error (logged on the server, never leaked).
+`fields` is present only for validation errors. Common statuses: `400` invalid input, `404` not found, `413` photo too large, `415` not an image, `502` Stripe could not complete the request, `503` database or Stripe not configured, `500` unexpected error (logged on the server, never leaked).
 
 ### `GET /api/listings`
 
@@ -154,10 +166,23 @@ Returns `201 { "message": { … } }`. The seller's email is filled in from the l
 
 Returns `{ "messages": [ … ] }`, newest first. Note that messages, including both email addresses, are readable by anyone who knows a listing id, as the schema's policies specify.
 
+### `POST /api/connect`
+
+```json
+{ "seller_email": "wei.gu@example.com" }
+```
+
+Creates (or reuses) the seller's Stripe account and returns `{ "url": "https://connect.stripe.com/…" }` to send them to Stripe's onboarding. If that email already finished onboarding it returns `{ "connected": true }` instead. An invalid email returns `400`, Stripe failures `502`, missing configuration `503`.
+
+### `GET /api/connect/refresh?account=acct_…`
+
+Stripe's refresh URL. Redirects (`302`) to a fresh onboarding link for an account saved by this app. Anything else, or any failure, redirects to `/connect?error=refresh`.
+
 ### Data model
 
 `listings`: `id`, `title`, `description`, `price`, `category` (slug), `seller_name`, `seller_email`, `image_url`, `location`, `created_at`, `updated_at`.
 `messages`: `id`, `listing_id` (deleted with its listing), `buyer_email`, `seller_email`, `message`, `created_at`.
+`stripe_accounts`: `id`, `seller_email` (lowercase, unique), `stripe_account_id` (unique), `details_submitted`, `charges_enabled`, `created_at`, `updated_at`. Also `orders`, and `status` / `sold_at` on `listings`; see [SCHEMA.md](SCHEMA.md#payments-stripe-connect).
 Photos live in the public Storage bucket `listing-images`. The full SQL is in [`supabase-schema.sql`](../supabase-schema.sql).
 
 ## Not included

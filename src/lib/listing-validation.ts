@@ -262,6 +262,53 @@ export function validateMessagesQuery(
   return { ok: true, data: { listing_id: listingId } };
 }
 
+export type ConnectPayload = { seller_email: string };
+
+const EMAIL_MAX = 255;
+
+export function validateConnectPayload(
+  body: unknown,
+): ValidationResult<ConnectPayload> {
+  if (!isRecord(body)) {
+    return { ok: false, errors: { body: "Send a JSON object." } };
+  }
+
+  const email =
+    typeof body.seller_email === "string" ? body.seller_email.trim() : "";
+  if (!email) {
+    return {
+      ok: false,
+      errors: { seller_email: "Enter the email you use on your listings." },
+    };
+  }
+  if (!isValidEmail(email) || email.length > EMAIL_MAX) {
+    return {
+      ok: false,
+      errors: { seller_email: "Enter a valid email address." },
+    };
+  }
+  return { ok: true, data: { seller_email: email } };
+}
+
+const STRIPE_ACCOUNT_ID_RE = /^acct_[A-Za-z0-9]{1,64}$/;
+
+export function isStripeAccountId(value: unknown): value is string {
+  return typeof value === "string" && STRIPE_ACCOUNT_ID_RE.test(value);
+}
+
+export function validateAccountParam(
+  params: URLSearchParams,
+): ValidationResult<{ account: string }> {
+  const account = params.get("account");
+  if (!isStripeAccountId(account)) {
+    return {
+      ok: false,
+      errors: { account: "account must be a valid Stripe account id." },
+    };
+  }
+  return { ok: true, data: { account } };
+}
+
 export type ListingQuery = {
   category?: string;
   q?: string;

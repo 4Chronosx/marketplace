@@ -105,6 +105,17 @@ export async function createListing(payload: NewListingPayload): Promise<Listing
   return listing;
 }
 
+export type OnboardingStart = { url: string } | { connected: true };
+
+/** Asks the server for Stripe's hosted onboarding link for this seller email. */
+export function startStripeOnboarding(sellerEmail: string): Promise<OnboardingStart> {
+  return request("/api/connect", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ seller_email: sellerEmail }),
+  });
+}
+
 export async function sendMessage(input: {
   listingId: string;
   buyerEmail: string;

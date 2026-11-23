@@ -24,6 +24,8 @@ src/
       listings/[id]/route.ts   GET (one)
       messages/route.ts        GET, POST
       upload/route.ts          POST (photo)
+      connect/route.ts         POST (start Stripe onboarding)
+      connect/refresh/route.ts GET (fresh onboarding link, redirects)
   components/
     layout/                    header, sidebar, mobile-nav, category-list
     marketplace/               item-grid, listing-card, item-details, create-item-form, message-form, ...
@@ -33,7 +35,8 @@ src/
     listing-validation.ts      limits and validation shared by browser and server
     listings.ts                Listing and ListingSummary types, formatPrice
     supabase.ts                lazy server-only Supabase client
-    stripe.ts                  lazy server-only Stripe client
+    stripe.ts                  lazy server-only Stripe client, account and onboarding-link helpers
+    connect.ts                 seller onboarding: Stripe account + saved row, status check
     db.ts                      typed database and storage queries
     api.ts                     response helpers for route handlers
     api-client.ts              browser fetch wrapper for /api

@@ -1,5 +1,5 @@
 import { DatabaseError, NotFoundError } from "./db";
-import { StripeNotConfiguredError } from "./stripe";
+import { StripeNotConfiguredError, isStripeError } from "./stripe";
 import { SupabaseNotConfiguredError } from "./supabase";
 
 /** `{ error: { message, fields? } }` with the given HTTP status. */
@@ -54,6 +54,11 @@ export function handleRouteError(error: unknown): Response {
   // Postgres foreign key violation: the referenced listing doesn't exist.
   if (error instanceof DatabaseError && error.code === "23503") {
     return jsonError(404, "Listing not found.");
+  }
+  // Stripe rejected or couldn't complete a request we made to it.
+  if (isStripeError(error)) {
+    console.error("Stripe error:", error.type, error.message);
+    return jsonError(502, "Stripe couldn't complete that request. Please try again.");
   }
   console.error("API error:", error);
   return jsonError(500, "Something went wrong. Please try again.");
