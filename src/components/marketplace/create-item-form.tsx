@@ -345,7 +345,7 @@ export function CreateItemForm() {
             aspectClassName="aspect-4/3"
           />
           <div className="min-w-0">
-            <p className="text-xl font-bold break-words">{fields.title.trim() || "Title"}</p>
+            <p className="text-xl font-bold wrap-break-word">{fields.title.trim() || "Title"}</p>
             <p className="text-xl font-bold">{price === null ? "Price" : formatPrice(price)}</p>
             <p className="mt-3 text-sm text-muted-foreground">
               Listed just now in {DEFAULT_LOCATION}
@@ -353,7 +353,7 @@ export function CreateItemForm() {
             <p className="mt-4 text-sm font-medium">Seller information</p>
             <p className="text-sm">{sellerName}</p>
             {fields.description.trim() && (
-              <p className="mt-3 text-sm break-words whitespace-pre-line">
+              <p className="mt-3 text-sm wrap-break-word whitespace-pre-line">
                 {fields.description.trim()}
               </p>
             )}

@@ -89,7 +89,7 @@ export function ItemDetails({ id }: { id: string }) {
 
         <div className="flex flex-col gap-6">
           <div>
-            <h1 className="text-2xl font-bold break-words">{listing.title}</h1>
+            <h1 className="text-2xl font-bold wrap-break-word">{listing.title}</h1>
             <p className="text-2xl font-bold">{formatPrice(listing.price)}</p>
             <p className="mt-3 text-sm text-muted-foreground">
               Listed <ListedTime iso={listing.created_at} /> in {listing.location}
@@ -100,7 +100,7 @@ export function ItemDetails({ id }: { id: string }) {
             <h2 id="description-heading" className="text-sm font-medium">
               Description
             </h2>
-            <p className="mt-1 text-sm break-words whitespace-pre-line text-foreground/80">
+            <p className="mt-1 text-sm wrap-break-word whitespace-pre-line text-foreground/80">
               {listing.description}
             </p>
           </section>

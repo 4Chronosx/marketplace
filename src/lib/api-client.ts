@@ -18,12 +18,29 @@ type ErrorBody = {
   error?: { message?: string; fields?: Record<string, string> };
 };
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
+// A stalled request would otherwise leave the loading state up forever.
+const REQUEST_TIMEOUT_MS = 20_000;
+const UPLOAD_TIMEOUT_MS = 60_000;
+
+async function request<T>(
+  url: string,
+  init?: RequestInit,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<T> {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+
   let response: Response;
   try {
-    response = await fetch(url, init);
+    response = await fetch(url, { ...init, signal });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      throw new ApiRequestError(
+        0,
+        "The server took too long to respond. Please try again.",
+      );
+    }
     throw new ApiRequestError(
       0,
       "Can't reach the server. Check your connection and try again.",
@@ -76,7 +93,7 @@ export async function fetchListing(
 export function uploadImage(file: File): Promise<{ url: string; path: string }> {
   const form = new FormData();
   form.append("file", file);
-  return request("/api/upload", { method: "POST", body: form });
+  return request("/api/upload", { method: "POST", body: form }, UPLOAD_TIMEOUT_MS);
 }
 
 export async function createListing(payload: NewListingPayload): Promise<Listing> {

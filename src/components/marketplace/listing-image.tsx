@@ -10,9 +10,9 @@ type ListingImageProps = {
   aspectClassName?: string;
 };
 
-// Square image tile. With no photo (all mock data) it shows a brand-tinted
-// placeholder. NOTE: remote `src` values need `images.remotePatterns` in
-// next.config.ts once Supabase Storage is wired up.
+// Square image tile. With no photo it shows a brand-tinted placeholder. Remote
+// `src` values must match `images.remotePatterns` in next.config.ts (Supabase
+// Storage is configured there).
 export function ListingImage({
   src,
   alt,
