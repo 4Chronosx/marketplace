@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/select";
 import { CATEGORIES } from "@/lib/categories";
 import { ApiRequestError, createListing, uploadImage } from "@/lib/api-client";
+import type { SellerPayments } from "@/lib/payments";
+import { ConnectPrompt } from "./connect-prompt";
 import { formatPrice } from "@/lib/listings";
 import {
   DESCRIPTION_MAX,
@@ -92,6 +94,8 @@ export function CreateItemForm() {
     Partial<Record<FieldName, string>>
   >({});
   const [createdId, setCreatedId] = useState<string | null>(null);
+  // Whether the seller can already take payments; decides if we offer Stripe after publishing.
+  const [sellerPayments, setSellerPayments] = useState<SellerPayments | null>(null);
   // photo id -> uploaded image URL, so a retry after a failed save doesn't upload again.
   const uploadedRef = useRef(new Map<string, string>());
 
@@ -137,7 +141,7 @@ export function CreateItemForm() {
         }
       }
 
-      const listing = await createListing({
+      const created = await createListing({
         title: fields.title.trim(),
         description: fields.description.trim(),
         price: parsePrice(fields.price) ?? 0,
@@ -146,7 +150,8 @@ export function CreateItemForm() {
         seller_email: fields.email.trim(),
         image_url: imageUrl,
       });
-      setCreatedId(listing.id);
+      setCreatedId(created.listing.id);
+      setSellerPayments(created.sellerPayments);
       setStatus("done");
     } catch (error) {
       setStatus("error");
@@ -189,31 +194,40 @@ export function CreateItemForm() {
     setServerErrors({});
     setSubmitError(null);
     setCreatedId(null);
+    setSellerPayments(null);
     uploadedRef.current.clear();
     setStatus("idle");
   }
 
   if (status === "done") {
     return (
-      <div className="flex max-w-xl flex-col items-start gap-3 rounded-xl border p-6">
-        <CheckCircle2Icon aria-hidden="true" className="size-8 text-brand" />
-        <h2 className="text-xl font-bold">Your listing is live</h2>
-        <p>
-          &ldquo;{fields.title.trim()}&rdquo; for {formatPrice(parsePrice(fields.price) ?? 0)}.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {createdId && (
-            <Link href={`/item/${createdId}`} className={buttonVariants()}>
-              View listing
+      <div className="flex max-w-xl flex-col gap-4">
+        <div className="flex flex-col items-start gap-3 rounded-xl border p-6">
+          <CheckCircle2Icon aria-hidden="true" className="size-8 text-brand" />
+          <h2 className="text-xl font-bold">Your listing is live</h2>
+          <p>
+            &ldquo;{fields.title.trim()}&rdquo; for {formatPrice(parsePrice(fields.price) ?? 0)}.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {createdId && (
+              <Link href={`/item/${createdId}`} className={buttonVariants()}>
+                View listing
+              </Link>
+            )}
+            <Link href="/" className={buttonVariants({ variant: "outline" })}>
+              Back to Marketplace
             </Link>
-          )}
-          <Link href="/" className={buttonVariants({ variant: "outline" })}>
-            Back to Marketplace
-          </Link>
-          <Button type="button" variant="outline" onClick={reset}>
-            Create another
-          </Button>
+            <Button type="button" variant="outline" onClick={reset}>
+              Create another
+            </Button>
+          </div>
         </div>
+        {sellerPayments && sellerPayments !== "ready" && (
+          <ConnectPrompt
+            email={fields.email.trim()}
+            unfinished={sellerPayments === "not_ready"}
+          />
+        )}
       </div>
     );
   }

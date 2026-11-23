@@ -1,10 +1,23 @@
 import { cachedJson, handleRouteError, jsonError, readJson } from "@/lib/api";
-import { dbCreateListing, dbListListings } from "@/lib/db";
+import { dbCreateListing, dbGetStripeAccountByEmail, dbListListings } from "@/lib/db";
 import {
   validateListingQuery,
   validateNewListingPayload,
 } from "@/lib/listing-validation";
+import { sellerPaymentsOf, type SellerPayments } from "@/lib/payments";
 import { listingImageUrlPrefix } from "@/lib/supabase";
+
+// Does this seller still need to connect Stripe? Only a hint for the prompt shown
+// after publishing, so if the lookup fails the listing is still created and the
+// seller is simply asked.
+async function sellerPaymentsFor(email: string): Promise<SellerPayments> {
+  try {
+    return sellerPaymentsOf(await dbGetStripeAccountByEmail(email));
+  } catch (error) {
+    console.error("Looking up the seller's Stripe account failed:", error);
+    return "none";
+  }
+}
 
 // GET /api/listings?category=&q=&limit=&offset=
 export async function GET(request: Request) {
@@ -30,7 +43,8 @@ export async function POST(request: Request) {
 
   try {
     const listing = await dbCreateListing(payload.data);
-    return Response.json({ listing }, { status: 201 });
+    const seller_payments = await sellerPaymentsFor(listing.seller_email);
+    return Response.json({ listing, seller_payments }, { status: 201 });
   } catch (error) {
     return handleRouteError(error);
   }

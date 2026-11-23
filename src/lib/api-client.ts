@@ -2,6 +2,7 @@
 import type { Listing, ListingDetail, ListingSummary } from "./listings";
 import { LIST_LIMIT_MAX, type NewListingPayload } from "./listing-validation";
 import type { OrderSummary } from "./orders";
+import type { SellerPayments } from "./payments";
 
 export class ApiRequestError extends Error {
   readonly status: number;
@@ -97,13 +98,19 @@ export function uploadImage(file: File): Promise<{ url: string; path: string }> 
   return request("/api/upload", { method: "POST", body: form }, UPLOAD_TIMEOUT_MS);
 }
 
-export async function createListing(payload: NewListingPayload): Promise<Listing> {
-  const { listing } = await request<{ listing: Listing }>("/api/listings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  return listing;
+/** A new listing, plus whether its seller still needs to connect Stripe. */
+export type CreatedListing = { listing: Listing; sellerPayments: SellerPayments };
+
+export async function createListing(payload: NewListingPayload): Promise<CreatedListing> {
+  const body = await request<{ listing: Listing; seller_payments?: SellerPayments }>(
+    "/api/listings",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  return { listing: body.listing, sellerPayments: body.seller_payments ?? "none" };
 }
 
 export type OrderResult =

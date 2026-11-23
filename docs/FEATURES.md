@@ -37,7 +37,7 @@ Behaviour:
 - Fields are checked in the browser first, and again on the server with the same rules. The first invalid field gets focus and every error is announced to screen readers.
 - The photo is uploaded first, then the listing is saved with the photo's address. If saving fails and you retry, the photo is **not uploaded again**.
 - Errors the server reports (for example a field it rejects) are shown next to the matching field.
-- On success you see "Your listing is live" with **View listing**, **Back to Marketplace** and **Create another**.
+- On success you see "Your listing is live" with **View listing**, **Back to Marketplace** and **Create another**. If the seller's email has no Stripe account that can take payments yet, a "Get paid when it sells" card with **Connect with Stripe** appears below it (see [Get paid with Stripe](#get-paid-with-stripe)).
 - The server checks the photo's actual bytes, so a renamed non-image file is rejected.
 
 Listings are created with the default location **Palo Alto, CA**.
@@ -79,9 +79,11 @@ The form on the listing page asks for **your email** (required) and a **message*
 
 ## Get paid with Stripe
 
-Sellers connect a Stripe account (test mode) so buyers can pay them. Reached from **Connect with Stripe** in the sidebar, or the link at the bottom of `/create`.
+Sellers connect a Stripe account (test mode) so buyers can pay them. Connecting is available in two places: a **Connect with Stripe** button in the sidebar (it opens `/connect`, where the seller enters the email they use on their listings), and a "Get paid when it sells" card on the "Your listing is live" screen right after publishing, which starts onboarding with one click.
 
-- Enter the email you use on your listings at `/connect`. There is no login, so the email is how a seller is identified.
+- The card appears after every listing until that email has a Stripe account that can take payments, so a seller who skips it is asked again on their next listing. It never appears for a seller who is already connected. If setup was started but not finished, the card says "Finish setting up Stripe".
+- One click on the card starts onboarding with the email from the listing just published, so there is nothing to type. The sidebar button is for everyone else, for example a seller whose listings already exist: they enter their email at `/connect`. Stripe also sends sellers back through `/connect/return` and `/api/connect/refresh`.
+- There is no login, so the email is how a seller is identified.
 - The server creates a Stripe Standard account for that email (or reuses the one already saved) and sends you to Stripe's hosted onboarding. The account id is saved in `stripe_accounts`, keyed by the lowercased email. The same email never gets two accounts.
 - When you finish or leave Stripe you land on `/connect/return`, which checks your status with Stripe: **connected**, **not finished** (with a **Continue with Stripe** button), or a not-found message for an unknown account.
 - If an onboarding link expires, Stripe returns you through `/api/connect/refresh`, which makes a fresh link.
@@ -128,7 +130,7 @@ After paying, Stripe sends the buyer to `/order/success`. The page shows what wa
 
 ## Layout and navigation
 
-- A header with the brand. On desktop a sidebar holds **Create new listing** and the category list; on mobile the sidebar becomes a slide-out menu.
+- A header with the brand. On desktop a sidebar holds **Create new listing**, **Connect with Stripe** and the category list; on mobile the sidebar becomes a slide-out menu.
 - The create and listing pages use a plain header only, so they are not cluttered by the category list.
 - Facebook blue (`#1877f2`) is the accent colour. The layout follows the mockups in `docs/mockups`.
 - Keyboard and screen reader support: visible focus rings, labelled controls, live regions for status and errors, and reduced-motion support for hover effects.
@@ -175,7 +177,7 @@ The response is cached at the CDN for 15 seconds (`s-maxage=15, stale-while-reva
 
 ### `POST /api/listings`
 
-Creates a listing. Returns `201 { "listing": { … } }` with every field.
+Creates a listing. Returns `201 { "listing": { … }, "seller_payments": "none" | "not_ready" | "ready" }`: the listing with every field, and whether the seller's Stripe account can take payments yet (`ready`), exists but can't (`not_ready`), or doesn't exist (`none`). The create form uses it to decide whether to show the Connect with Stripe card.
 
 ```json
 { "title": "Bike 24 inch", "description": "Lightly used.", "price": 99, "category": "sporting-goods", "seller_name": "Wei Gu", "seller_email": "wei.gu@example.com", "image_url": null }

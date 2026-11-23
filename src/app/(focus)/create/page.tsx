@@ -91,17 +91,6 @@ export default function CreatePage() {
           })}
         </ul>
       </div>
-
-      <p className="text-sm text-muted-foreground">
-        Selling something?{" "}
-        <Link
-          href="/connect"
-          className="rounded-sm font-medium text-brand underline-offset-2 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          Connect with Stripe
-        </Link>{" "}
-        to get paid when it sells.
-      </p>
     </div>
   );
 }
