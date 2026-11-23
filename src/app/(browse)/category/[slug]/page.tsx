@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { CATEGORIES, getCategoryBySlug } from "@/lib/categories";
-import { getListings } from "@/lib/listings";
+import { CATEGORIES, categoryHref, getCategoryBySlug } from "@/lib/categories";
 import { ItemGrid } from "@/components/marketplace/item-grid";
+import { ListingGridSkeleton } from "@/components/marketplace/listing-grid-skeleton";
+import { SearchForm } from "@/components/marketplace/search-form";
 
 // Every slug is known at build time, so the layout's active-link sidebar
 // resolves during prerendering.
@@ -16,15 +18,13 @@ export default async function CategoryPage({
   const category = getCategoryBySlug(slug);
   if (!category) notFound();
 
-  const listings = await getListings({ category: category.slug });
-
   return (
     <>
       <h1 className="mb-4 text-xl font-bold">{category.name}</h1>
-      <ItemGrid
-        listings={listings}
-        emptyMessage="No listings in this category yet."
-      />
+      <SearchForm action={categoryHref(category.slug)} />
+      <Suspense fallback={<ListingGridSkeleton />}>
+        <ItemGrid category={category.slug} categoryName={category.name} />
+      </Suspense>
     </>
   );
 }
