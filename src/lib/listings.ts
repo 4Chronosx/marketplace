@@ -26,6 +26,7 @@ export type NewListingInput = {
   description: string;
   price: number;
   category: string;
+  seller_name: string;
   seller_email: string;
   photos: File[];
 };
@@ -39,14 +40,6 @@ export function formatPrice(price: number): string {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
   }).format(price);
-}
-
-/** "wei.gu@example.com" -> "Wei Gu" (used where only an email is known). */
-export function nameFromEmail(email: string): string {
-  const local = email.split("@")[0] ?? "";
-  const words = local.split(/[._-]+/).filter(Boolean);
-  if (words.length === 0) return "Seller";
-  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
 
 export async function getListings(
@@ -71,6 +64,7 @@ export async function createListing(input: NewListingInput): Promise<void> {
 // TODO(step 10): replace with a POST to /api/messages (Supabase insert).
 export async function sendMessage(input: {
   listingId: string;
+  buyerEmail: string;
   message: string;
 }): Promise<void> {
   void input;

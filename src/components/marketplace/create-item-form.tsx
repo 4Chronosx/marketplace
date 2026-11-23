@@ -14,12 +14,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CATEGORIES } from "@/lib/categories";
-import { createListing, formatPrice, nameFromEmail } from "@/lib/listings";
+import { createListing, formatPrice } from "@/lib/listings";
 import {
   DESCRIPTION_MAX,
+  NAME_MAX,
   TITLE_MAX,
   formatPriceInput,
-  isValidEmail,
   parsePrice,
   sanitizePriceInput,
   validateListing,
@@ -31,9 +31,10 @@ import { PhotoDropzone, type Photo } from "./photo-dropzone";
 
 const DEFAULT_LOCATION = "Palo Alto, CA";
 const CATEGORY_ITEMS = CATEGORIES.map((c) => ({ value: c.slug, label: c.name }));
-const FIELD_ORDER: FieldName[] = ["title", "price", "category", "email", "description"];
+const FIELD_ORDER: FieldName[] = ["title", "price", "category", "name", "email", "description"];
 const EMPTY_FIELDS: ListingFields = {
   title: "",
+  name: "",
   price: "",
   category: "",
   email: "",
@@ -108,6 +109,7 @@ export function CreateItemForm() {
         description: fields.description.trim(),
         price: parsePrice(fields.price) ?? 0,
         category: fields.category,
+        seller_name: fields.name.trim(),
         seller_email: fields.email.trim(),
         photos: photos.map((photo) => photo.file),
       });
@@ -151,7 +153,7 @@ export function CreateItemForm() {
   }
 
   const price = parsePrice(fields.price);
-  const sellerName = isValidEmail(fields.email) ? nameFromEmail(fields.email) : "Your name";
+  const sellerName = fields.name.trim() || "Your name";
   const submitting = status === "submitting";
 
   return (
@@ -215,6 +217,17 @@ export function CreateItemForm() {
               ))}
             </SelectContent>
           </Select>
+        </Field>
+
+        <Field name="name" label="Your name" error={visibleError("name")}>
+          <Input
+            {...a11y("name")}
+            autoComplete="name"
+            maxLength={NAME_MAX + 20}
+            value={fields.name}
+            onChange={(e) => setField("name", e.target.value)}
+            onBlur={() => touch("name")}
+          />
         </Field>
 
         <Field name="email" label="Email" error={visibleError("email")}>
