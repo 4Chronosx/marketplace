@@ -3,10 +3,11 @@ import { isCheckoutSessionId, isUuid } from "@/lib/listing-validation";
 import { getOrderLookup } from "@/lib/orders";
 
 // GET /api/orders/[sessionId]?listing_id=<uuid>
-// 200 { order }          the order is saved
-// 202 { pending: true }  Stripe says it was paid; the webhook hasn't saved it yet
+// 200 { order }          the order is saved (if Stripe says the session was paid but
+//                        the webhook hasn't saved it, it is saved right here)
+// 202 { pending: true }  paid, but saving the order failed; ask again shortly
 // 404                    not a real, paid session for this marketplace
-// Never cached: the answer changes as soon as the webhook lands.
+// Never cached: the answer changes as soon as the order is saved.
 export async function GET(
   request: Request,
   ctx: RouteContext<"/api/orders/[sessionId]">,

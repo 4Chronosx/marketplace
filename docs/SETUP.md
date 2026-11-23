@@ -150,7 +150,7 @@ Do these in order. The webhook secret only exists once the endpoint is registere
    node --env-file=.env.local scripts/create-webhook.mjs
    ```
 
-   The default URL is the project's production URL; pass `--url=https://your-domain/api/stripe/webhook` to use another. The script prints a `whsec_...` signing secret **once**.
+   The default URL is the project's production URL; pass `--url=https://your-domain/api/stripe/webhook` to use another. The script prints a `whsec_...` signing secret **once**. If Stripe answers `You have reached the maximum of 16 test webhook endpoints`, the shared sandbox is full of other people's endpoints: don't delete them, ask the organizers to clear stale ones or raise the limit. Until then the app still works, because the order page saves a paid order itself.
 4. **Save the secret** in Vercel as a variable named exactly `STRIPE_WEBHOOK_SECRET` (Production), then **redeploy**. Do not put it in `.env.local`: local testing uses the temporary secret from `stripe listen` (see section 3).
 5. **If you lose the secret**, run the script again with `--replace`. It deletes the endpoint with that exact URL and creates a new one with a new secret. It never touches other endpoints; the Stripe sandbox is shared with other people, so the endpoint also receives events that aren't yours, which the app ignores.
 6. **Try it:** on the live site connect a seller at `/connect` with Stripe's test data, open one of that seller's listings, click **Buy Now** and pay with `4242 4242 4242 4242`. You should land on the order page, the order should appear in the `orders` table, and the listing should show **Sold**.

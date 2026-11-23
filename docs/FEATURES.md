@@ -114,13 +114,14 @@ Stripe tells the marketplace when a payment goes through by calling `POST /api/s
 - Stripe may deliver an event more than once. A repeat never creates a second order.
 - The test sandbox is shared with other apps, so the endpoint also receives events that aren't ours: unknown accounts, unknown listings, unpaid sessions and other event types. All of these are ignored and answered `200`.
 - If two buyers pay for the same listing, both orders are recorded and a warning is logged so the second payment can be refunded by hand.
+- The order page is a safety net for this: if a paid order hasn't been saved by the webhook, loading the order page saves it. A buyer who pays but closes the tab before the order page loads depends on the webhook alone.
 - `account.updated` (a seller's Stripe account changed) refreshes that seller's saved status. Events can arrive late or out of order, so the handler reads the account's current state from Stripe instead of trusting the event. Accounts this app didn't save are ignored before any Stripe call.
 
 ## Order confirmation
 
 After paying, Stripe sends the buyer to `/order/success`. The page shows what was bought (photo, title, seller, amount paid) and a short order reference, with **View listing** and **Back to Marketplace**. It never shows the buyer's email, Stripe ids or the platform fee.
 
-- The buyer can arrive **before** the webhook has saved the order. The page then says "Payment received. We're confirming your order" and checks again every 2 seconds, switching to the confirmation by itself. It only says this when Stripe confirms the session really was paid.
+- The buyer can arrive **before** the webhook has saved the order (or the webhook may not be registered at all). If Stripe confirms the session really was paid, the order page saves the order and marks the listing Sold itself, using the same idempotent code the webhook uses, so a webhook arriving later finds it and nothing is duplicated. Only if that save fails does the page say "Payment received. We're confirming your order" and check again every 2 seconds, switching to the confirmation by itself.
 - After about 30 seconds it says "We're still confirming your order" and offers **Check again**. The payment is safe; the buyer must not pay twice.
 - A malformed or unknown session id shows "We couldn't find that order" with a way back, and a malformed one never calls the server.
 - Once an order is saved, the listing shows a **Sold** badge on its card (dimmed photo) and on its page. Sold listings stay in the browse grids.
@@ -238,8 +239,8 @@ The order for a Stripe Checkout session, for the confirmation page. Never cached
 
 | Status | When |
 |---|---|
-| `200 { "order": { … } }` | The order is saved. The body has `reference`, `amount_total` (cents), `currency`, `created_at` and `listing` (`id`, `title`, `image_url`, `seller_name`). |
-| `202 { "pending": true }` | Stripe says the session was paid (checked against the listing's seller account), but the webhook hasn't saved the order yet. |
+| `200 { "order": { … } }` | The order is saved (a paid order the webhook hasn't saved yet is saved by this request). The body has `reference`, `amount_total` (cents), `currency`, `created_at` and `listing` (`id`, `title`, `image_url`, `seller_name`). |
+| `202 { "pending": true }` | Stripe says the session was paid (checked against the listing's seller account), but saving the order failed. Ask again shortly. |
 | `404` | Malformed or unknown session id, an unpaid session, or one that doesn't belong to this listing. |
 
 ### Data model

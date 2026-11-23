@@ -42,7 +42,8 @@ src/
     connect.ts                 seller onboarding: Stripe account + saved row, status check
     payments.ts                fee rate, currency, cents math, BuyStatus (shared by browser and server)
     checkout.ts                Buy Now: can this listing be bought, then open Checkout
-    webhook.ts                 what to do with a verified Stripe event (order + Sold)
+    webhook.ts                 what to do with a verified Stripe event
+    fulfillment.ts             a paid session becomes an order + Sold (webhook and order page both call it)
     orders.ts                  the order confirmation shown to the buyer (safe fields only)
     db.ts                      typed database and storage queries
     api.ts                     response helpers for route handlers
@@ -98,6 +99,7 @@ Browser component
 | The webhook verifies Stripe's signature on the raw body before anything else | Nobody can post a fake "payment completed" to `/api/stripe/webhook`. It reads `request.text()`, never `request.json()`, because parsing changes the bytes the signature covers. |
 | The webhook ignores anything it doesn't recognise, and still answers 200 | The sandbox is shared, so it also receives other apps' events. Unknown accounts, listings, unpaid sessions and a session whose account doesn't own the listing record nothing. |
 | The saved `charges_enabled` flag is a display hint; Stripe is the authority | Anyone with the anon key can edit the flag, so it only decides whether the page shows Buy Now. Checkout reads the account from Stripe before taking a payment, and `account.updated` re-reads it from Stripe instead of trusting the event body. |
+| The order page saves a paid order itself if the webhook hasn't | The shared sandbox caps webhook endpoints at 16, so registering one can fail, and the webhook can also arrive late. `GET /api/orders/[sessionId]` asks Stripe whether the session was paid and, if so, runs the same idempotent `recordPaidSession` the webhook runs. Limitation: a buyer who closes the tab before the order page loads depends on the webhook alone. |
 | `orders.stripe_session_id` is unique | Stripe retries webhooks; `dbCreateOrder` treats a repeat as already recorded. |
 | Credentials only on the server | Nothing secret in the browser bundle. |
 | `seller_email` on a message is looked up from the listing | A caller cannot spoof who a message is for. |

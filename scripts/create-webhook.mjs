@@ -59,13 +59,26 @@ for (const endpoint of existing) {
   console.log(`Deleted the old endpoint for this URL: ${endpoint.id}`);
 }
 
-const endpoint = await stripe.webhookEndpoints.create({
-  url,
-  // The payment happens on the seller's connected account, so its events are Connect events.
-  connect: true,
-  enabled_events: EVENTS,
-  description: "marketplace (production)",
-});
+let endpoint;
+try {
+  endpoint = await stripe.webhookEndpoints.create({
+    url,
+    // The payment happens on the seller's connected account, so its events are Connect events.
+    connect: true,
+    enabled_events: EVENTS,
+    description: "marketplace (production)",
+  });
+} catch (error) {
+  if (String(error?.message).includes("maximum of")) {
+    fail(
+      "Stripe won't create another webhook endpoint: this sandbox is at its limit, and the\n" +
+        "endpoints that fill it belong to other people. Do NOT delete them.\n" +
+        "Ask the organizers to clear stale endpoints or raise the limit, then run this again.\n" +
+        "Until then the app still records orders: the order page saves a paid order itself.",
+    );
+  }
+  throw error;
+}
 
 console.log(`
 Created ${endpoint.id}
