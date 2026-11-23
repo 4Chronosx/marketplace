@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Marketplace
 
-## Getting Started
+A Facebook Marketplace-style classifieds site. Visitors can post a listing with a photo, browse and search listings by category, open a listing, and send the seller a message. No login is needed.
 
-First, run the development server:
+Built with **Next.js 16 (App Router)**, **React 19**, **Tailwind CSS 4** and **Supabase** (Postgres + Storage), and designed to deploy on **Vercel**.
+
+## What it does
+
+| | |
+|---|---|
+| **Create a listing** | Photo, title, price, category, your name, email and description, with a live preview. Saved in Supabase. |
+| **Browse and search** | Home page grid, a page per category (19 categories), and keyword search by title or description. |
+| **Listing page** | Photo, price, description, seller details and when it was listed. |
+| **Message Seller** | A buyer's email and message are saved in Supabase. (Sending a real email is not included.) |
+
+See [docs/FEATURES.md](docs/FEATURES.md) for the details, rules and limits.
+
+## Quick start
+
+You need Node.js 22 or newer and a free [Supabase](https://supabase.com) project.
 
 ```bash
+npm install
+cp .env.example .env.local      # then fill in the two Supabase values
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. Before the first run, create the database tables once by running [`supabase-schema.sql`](supabase-schema.sql) in the Supabase SQL editor. Without the credentials the site still builds and runs, but the API answers `503` and the pages show "The database isn't set up yet".
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Step-by-step instructions, including deploying to Vercel, are in [docs/SETUP.md](docs/SETUP.md).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
 
-## Learn More
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start the development server |
+| `npm run build` | Create a production build |
+| `npm run start` | Serve the production build |
+| `npm run lint` | Run ESLint |
 
-To learn more about Next.js, take a look at the following resources:
+## Tech stack
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Next.js 16** App Router with Cache Components, **React 19**, **TypeScript**
+- **Tailwind CSS 4** and [shadcn/ui](https://ui.shadcn.com) components (Base UI), Geist fonts, lucide icons
+- **Supabase**: Postgres for listings and messages, Storage for photos, accessed only from the server with the public (anon) key and Row Level Security
+- **Vercel** for hosting
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project structure
 
-## Deploy on Vercel
+```
+src/
+  app/            Pages, route groups and the /api route handlers
+  components/     layout/ (header, sidebar), marketplace/ (features), ui/ (shadcn)
+  lib/            Database, validation, API client and shared helpers
+supabase-schema.sql   Tables, storage bucket, indexes and security policies
+docs/                 Project documentation
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Documentation
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [docs/SETUP.md](docs/SETUP.md): detailed setup, environment variables, deployment and troubleshooting
+- [docs/FEATURES.md](docs/FEATURES.md): features, validation rules, limits and the API reference
+- [docs/DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md): how the code is organised and why, with notes for contributors
+- [docs/step-by-step-guide.md](docs/step-by-step-guide.md): the build plan this project followed
+- [docs/PROJECT.md](docs/PROJECT.md): the original brief
